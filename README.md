@@ -1,56 +1,51 @@
 # AROX — AI Development Assistant
 
-**AROX** is an AI-assisted engineering assistant being built in the `KPMC-Ai` repository. Its goal is to help inspect, build, test, review, and maintain Financial OS and other projects while keeping each repository isolated.
+AROX is a cloud-hosted AI coding assistant being built in the `KPMC-Ai` repository. It is designed to use Claude as the default model and OpenAI as an optional second provider, with both API keys stored only in the deployment environment.
 
-> AROX is the product name. `KPMC-Ai` remains the GitHub repository name.
+## Implemented in the initial scaffold
 
-## Mission
+- FastAPI service with a public `/health` endpoint.
+- Authenticated `POST /api/chat` endpoint using a bearer token (`AROX_ACCESS_TOKEN`).
+- Claude Messages API and OpenAI Chat Completions API adapters.
+- Provider/model configuration through environment variables.
+- Render Blueprint configuration in `render.yaml`.
+- Starter tests for health and chat access control.
 
-- Inspect existing code and documentation before proposing changes.
-- Turn approved requirements into small, reviewable changes.
-- Add and run relevant tests where the environment permits.
-- Report exactly what changed, what was tested, and what remains unverified.
-- Keep project boundaries, credentials, and production data protected.
+## Run locally
 
-## Operating principles
+1. Use Python 3.12 or newer.
+2. Create a virtual environment and install dependencies:
 
-1. **Inspect before editing.** Understand the target repository and current implementation first.
-2. **Preserve working behavior.** Prefer focused changes; do not rewrite unrelated modules.
-3. **Separate repositories.** AROX is the assistant/tooling project. Financial OS remains in its own repository with its own database, deployment, and configuration.
-4. **No secrets in Git.** Never commit API keys, tokens, passwords, private keys, database URLs, or production data. Use environment variables or an approved secret manager.
-5. **Test before merging.** Run applicable checks and report their results honestly.
-6. **Human approval for high-impact actions.** Do not deploy, alter production infrastructure, change repository visibility, or make destructive data changes without explicit approval.
-7. **Least privilege.** Grant AROX access only to repositories and operations it needs. Repository access does not imply that every action is safe or supported.
-8. **Traceable changes.** Use small commits with clear messages and summarize changed files and test evidence.
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+   pip install -r requirements.txt
+   ```
 
-## Planned capabilities
+3. Set environment variables from `.env.example` in your shell or local environment. Never commit real API keys or tokens.
+4. Start the API:
 
-- Repository and documentation inspection.
-- AI model integration behind a provider-independent interface.
-- Controlled code editing and test execution.
-- Change summaries and code review assistance.
-- Multi-repository project context with strict separation.
-- Optional Git operations and deployment assistance, with approval gates.
+   ```bash
+   uvicorn app.main:app --reload
+   ```
 
-These are planned capabilities; they are not all implemented yet.
+5. Check `GET /health`. To call `POST /api/chat`, send `Authorization: Bearer <AROX_ACCESS_TOKEN>` and JSON such as `{"provider":"claude","message":"Help me understand this function"}`.
+6. Run tests with `pytest`.
 
-## Financial OS boundary
+## Render deployment
 
-Financial OS is a separate project. Its existing working functionality must be preserved. Deterministic, tested code should remain responsible for financial calculations; AI may assist with explanations, coding, and information gathering. Never copy Financial OS secrets, user financial data, or production configuration into this repository.
+Connect this repository to Render and deploy using the `render.yaml` Blueprint. Render generates `AROX_ACCESS_TOKEN`; add valid provider keys in the service's Environment settings. API usage is billed separately by each model provider. Review the current model IDs and provider billing before production use.
 
-## Development status
+## Security and boundaries
 
-AROX is at the initial setup stage. This README describes the intended direction; it does not mean an AI model, autonomous agent, repository automation, or deployment has already been implemented.
-
-## Roadmap
-
-1. Establish the execution environment and secure configuration.
-2. Add a minimal application skeleton and configuration validation.
-3. Add tests for safety boundaries and repository separation.
-4. Integrate one AI model behind a provider-independent interface.
-5. Begin with read-only repository inspection.
-6. Add controlled edits, tests, and Git operations incrementally.
+- Never commit API keys, passwords, tokens, private keys, database URLs, or production data.
+- The chat endpoint is disabled until `AROX_ACCESS_TOKEN` is configured and requires a valid bearer token afterward.
+- Do not expose this token in browser-side code or public frontend assets.
+- Provider calls have a timeout; upstream error details and credentials are not returned to callers.
+- GitHub repository inspection/editing, autonomous code execution, multi-agent orchestration, and deployment actions are **not implemented yet**. The current scaffold only provides a protected chat API.
+- Keep Financial OS in its own repository and preserve its existing functionality. Do not copy its secrets or production data into KPMC-Ai.
+- Require human review before repository writes, merges, deployments, or destructive actions.
 
 ## License
 
-No license has been selected yet. Until a license is added, do not assume this project's code is licensed for reuse by others.
+No license has been selected. Until a license is added, do not assume this project's code is licensed for reuse by others.
