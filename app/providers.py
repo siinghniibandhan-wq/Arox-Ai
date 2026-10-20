@@ -7,7 +7,13 @@ from typing import Literal
 
 import httpx
 
-Provider = Literal["claude", "openai"]
+Provider = Literal["gemini", "claude", "openai"]
+
+_SYSTEM_PROMPT = (
+    "You are AROX, a careful AI development assistant. Prefer lean, clean, "
+    "maintainable code. Do not claim to have edited repositories or run tests "
+    "unless tools actually did so. Never ask users to paste secrets into chat."
+)
 
 
 class ProviderConfigurationError(RuntimeError):
@@ -22,7 +28,36 @@ async def generate_reply(provider: Provider, prompt: str) -> str:
     timeout = httpx.Timeout(45.0, connect=10.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
-            if provider == "claude":
+            if provider == "gemini":
+                api_key = os.getenv("GEMINI_API_KEY", "").strip()
+                if not api_key:
+                    raise ProviderConfigurationError(
+                        "Gemini is not configured. Set GEMINI_API_KEY."
+                    )
+                model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+                response = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                    headers={
+                        "x-goog-api-key": api_key,
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "systemInstruction": {"parts": [{"text": _SYSTEM_PROMPT}]},
+                        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                        "generationConfig": {"maxOutputTokens": 1200},
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                parts = (
+                    data.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [])
+                )
+                reply = "\n".join(
+                    part.get("text", "") for part in parts if part.get("text")
+                ).strip()
+            elif provider == "claude":
                 api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
                 if not api_key:
                     raise ProviderConfigurationError("Claude is not configured. Set ANTHROPIC_API_KEY.")
@@ -37,7 +72,7 @@ async def generate_reply(provider: Provider, prompt: str) -> str:
                     json={
                         "model": model,
                         "max_tokens": 1200,
-                        "system": "You are AROX, a careful AI development assistant. Prefer lean, clean, maintainable code. Do not claim to have edited repositories or run tests unless tools actually did so. Never ask users to paste secrets into chat.",
+                        "system": _SYSTEM_PROMPT,
                         "messages": [{"role": "user", "content": prompt}],
                     },
                 )
@@ -57,7 +92,7 @@ async def generate_reply(provider: Provider, prompt: str) -> str:
                         "model": model,
                         "max_tokens": 1200,
                         "messages": [
-                            {"role": "system", "content": "You are AROX, a careful AI development assistant. Prefer lean, clean, maintainable code. Do not claim to have edited repositories or run tests unless tools actually did so. Never ask users to paste secrets into chat."},
+                            {"role": "system", "content": _SYSTEM_PROMPT},
                             {"role": "user", "content": prompt},
                         ],
                     },
@@ -67,7 +102,7 @@ async def generate_reply(provider: Provider, prompt: str) -> str:
                 reply = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         except ProviderConfigurationError:
             raise
-        except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
+        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
             # Keep upstream response bodies and credentials out of public errors/logs.
             raise ProviderRequestError("The selected AI provider request failed.") from exc
 

@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 
 from app.providers import ProviderConfigurationError, ProviderRequestError, generate_reply
 
+ProviderName = Literal["gemini", "claude", "openai"]
+
 app = FastAPI(
     title="AROX AI Development Assistant",
     description="A minimal cloud API for a multi-provider AI coding assistant.",
@@ -20,11 +22,11 @@ app = FastAPI(
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
-    provider: Literal["claude", "openai"] = "claude"
+    provider: ProviderName = "gemini"
 
 
 class ChatResponse(BaseModel):
-    provider: Literal["claude", "openai"]
+    provider: ProviderName
     reply: str
 
 
