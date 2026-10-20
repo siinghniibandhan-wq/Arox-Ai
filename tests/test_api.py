@@ -35,11 +35,11 @@ def test_chat_is_disabled_until_access_token_is_configured(monkeypatch) -> None:
     assert response.status_code == 503
 
 
-def test_chat_returns_provider_reply(monkeypatch) -> None:
+def test_chat_defaults_to_gemini(monkeypatch) -> None:
     monkeypatch.setenv("AROX_ACCESS_TOKEN", "test-secret")
 
     async def fake_generate_reply(provider: str, prompt: str) -> str:
-        assert provider == "claude"
+        assert provider == "gemini"
         assert prompt == "Hello AROX"
         return "Hello. Ready to help."
 
@@ -47,20 +47,37 @@ def test_chat_returns_provider_reply(monkeypatch) -> None:
     response = client.post(
         "/api/chat",
         headers={"Authorization": "Bearer test-secret"},
-        json={"message": "  Hello AROX  ", "provider": "claude"},
+        json={"message": "  Hello AROX  "},
     )
     assert response.status_code == 200
     assert response.json() == {
-        "provider": "claude",
+        "provider": "gemini",
         "reply": "Hello. Ready to help.",
     }
+
+
+def test_optional_claude_provider_remains_available(monkeypatch) -> None:
+    monkeypatch.setenv("AROX_ACCESS_TOKEN", "test-secret")
+
+    async def fake_generate_reply(provider: str, prompt: str) -> str:
+        assert provider == "claude"
+        return "Claude reply"
+
+    monkeypatch.setattr("app.main.generate_reply", fake_generate_reply)
+    response = client.post(
+        "/api/chat",
+        headers={"Authorization": "Bearer test-secret"},
+        json={"message": "Hello", "provider": "claude"},
+    )
+    assert response.status_code == 200
+    assert response.json()["provider"] == "claude"
 
 
 def test_chat_maps_missing_provider_configuration_to_503(monkeypatch) -> None:
     monkeypatch.setenv("AROX_ACCESS_TOKEN", "test-secret")
 
     async def fake_generate_reply(provider: str, prompt: str) -> str:
-        raise ProviderConfigurationError("Claude is not configured.")
+        raise ProviderConfigurationError("Gemini is not configured. Set GEMINI_API_KEY.")
 
     monkeypatch.setattr("app.main.generate_reply", fake_generate_reply)
     response = client.post(
@@ -69,7 +86,7 @@ def test_chat_maps_missing_provider_configuration_to_503(monkeypatch) -> None:
         json={"message": "Hello"},
     )
     assert response.status_code == 503
-    assert response.json()["detail"] == "Claude is not configured."
+    assert response.json()["detail"] == "Gemini is not configured. Set GEMINI_API_KEY."
 
 
 def test_chat_hides_upstream_provider_error_details(monkeypatch) -> None:
