@@ -1,15 +1,29 @@
-# AROX — AI Development Assistant
+# KPMC AI
 
-AROX is a cloud-hosted AI coding assistant being built in the `KPMC-Ai` repository. It is designed to use Claude as the default model and OpenAI as an optional second provider, with both API keys stored only in the deployment environment.
+KPMC AI is a chat-only workspace with a protected FastAPI backend and a React/Vite frontend. Each AI platform is presented as a separate tab; the API reports each integration's configured state and supported features.
 
-## Implemented in the initial scaffold
+## API scope
 
-- FastAPI service with a public `/health` endpoint.
-- Authenticated `POST /api/chat` endpoint using a bearer token (`AROX_ACCESS_TOKEN`).
-- Claude Messages API and OpenAI Chat Completions API adapters.
-- Provider/model configuration through environment variables.
-- Render Blueprint configuration in `render.yaml`.
-- Starter tests for health and chat access control.
+- Public `GET /health` endpoint.
+- Authenticated `GET /api/providers` endpoint lists provider tabs, configuration state, and chat-only feature metadata without exposing credentials.
+- Authenticated `POST /api/chat` endpoint supports provider selection.
+- Provider adapters for FreeLLMAPI and OmniRoute OpenAI-compatible gateways.
+- Optional direct Claude and OpenAI chat adapters.
+- A separate, opt-in GodMode-compatible gateway slot. GodMode is a chat interface/project and is **not automatically an API gateway**; configure `GODMODE_BASE_URL` only when a compatible endpoint has been independently deployed and verified.
+- Free-first routing in `auto` mode, with fallback to configured routes if an upstream fails.
+
+## Environment configuration
+
+Set these in the backend service environment. Never commit real API keys or tokens.
+
+- `AROX_ACCESS_TOKEN`: required bearer token for protected API routes.
+- `FREELLMAPI_BASE_URL`, `FREELLMAPI_API_KEY`, `FREELLMAPI_MODEL`
+- `OMNIROUTE_BASE_URL`, `OMNIROUTE_API_KEY`, `OMNIROUTE_MODEL`
+- `GODMODE_BASE_URL`, `GODMODE_API_KEY`, `GODMODE_MODEL` (optional; compatible endpoint required)
+- `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (optional; usage may be paid)
+- `OPENAI_API_KEY`, `OPENAI_MODEL` (optional; usage may be paid)
+
+Copy `.env.example` for local development and replace placeholders locally. Do not put provider credentials in frontend code.
 
 ## Run locally
 
@@ -22,30 +36,29 @@ AROX is a cloud-hosted AI coding assistant being built in the `KPMC-Ai` reposito
    pip install -r requirements.txt
    ```
 
-3. Set environment variables from `.env.example` in your shell or local environment. Never commit real API keys or tokens.
+3. Set environment variables from `.env.example` in your shell or local environment.
 4. Start the API:
 
    ```bash
    uvicorn app.main:app --reload
    ```
 
-5. Check `GET /health`. To call `POST /api/chat`, send `Authorization: Bearer <AROX_ACCESS_TOKEN>` and JSON such as `{"provider":"claude","message":"Help me understand this function"}`.
+5. Check `GET /health`. For protected routes, send `Authorization: Bearer <AROX_ACCESS_TOKEN>`.
 6. Run tests with `pytest`.
 
-## Render deployment
+## Deployment notes
 
-Connect this repository to Render and deploy using the `render.yaml` Blueprint. Render generates `AROX_ACCESS_TOKEN`; add valid provider keys in the service's Environment settings. API usage is billed separately by each model provider. Review the current model IDs and provider billing before production use.
+The frontend can be hosted separately from the backend. Configure CORS for the exact deployed frontend origin. Do not embed a long-lived shared bearer token in public browser code; production use should add a user/session-based authentication layer.
 
 ## Security and boundaries
 
-- Never commit API keys, passwords, tokens, private keys, database URLs, or production data.
-- The chat endpoint is disabled until `AROX_ACCESS_TOKEN` is configured and requires a valid bearer token afterward.
-- Do not expose this token in browser-side code or public frontend assets.
-- Provider calls have a timeout; upstream error details and credentials are not returned to callers.
-- GitHub repository inspection/editing, autonomous code execution, multi-agent orchestration, and deployment actions are **not implemented yet**. The current scaffold only provides a protected chat API.
-- Keep Financial OS in its own repository and preserve its existing functionality. Do not copy its secrets or production data into KPMC-Ai.
+- Keep API keys, passwords, tokens, private keys, database URLs, and production data out of Git.
+- Protected endpoints return no provider secrets.
+- Free-tier availability, limits, and upstream terms vary by provider.
+- This API is chat-only: no trading, financial analysis, autonomous agents, repository writes, or code execution are exposed.
+- Keep Financial OS in its own repository and preserve its existing functionality. Do not copy its secrets or production data into KPMC AI.
 - Require human review before repository writes, merges, deployments, or destructive actions.
 
 ## License
 
-No license has been selected. Until a license is added, do not assume this project's code is licensed for reuse by others.
+No license has been selected for KPMC AI. Until a license is added, do not assume this project's code is licensed for reuse by others.
