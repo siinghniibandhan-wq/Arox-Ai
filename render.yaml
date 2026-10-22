@@ -11,6 +11,18 @@ services:
         value: 3.12.8
       - key: AROX_ACCESS_TOKEN
         generateValue: true
+      - key: FREELLMAPI_BASE_URL
+        sync: false
+      - key: FREELLMAPI_API_KEY
+        sync: false
+      - key: FREELLMAPI_MODEL
+        value: auto
+      - key: OMNIROUTE_BASE_URL
+        sync: false
+      - key: OMNIROUTE_API_KEY
+        sync: false
+      - key: OMNIROUTE_MODEL
+        value: auto
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
