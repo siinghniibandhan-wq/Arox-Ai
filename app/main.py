@@ -11,20 +11,22 @@ from pydantic import BaseModel, Field
 
 from app.providers import ProviderConfigurationError, ProviderRequestError, generate_reply
 
+Provider = Literal["auto", "freellmapi", "omniroute", "godmode", "claude", "openai"]
+
 app = FastAPI(
-    title="AROX AI Unified API",
-    description="A protected, multi-provider AI API with free-first gateway routing.",
-    version="0.2.0",
+    title="KPMC AI API",
+    description="Authenticated chat API for separately configured AI provider tabs.",
+    version="0.3.0",
 )
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
-    provider: Literal["auto", "freellmapi", "omniroute", "claude", "openai"] = "auto"
+    provider: Provider = "auto"
 
 
 class ChatResponse(BaseModel):
-    provider: Literal["auto", "freellmapi", "omniroute", "claude", "openai"]
+    provider: Provider
     reply: str
 
 
@@ -33,7 +35,7 @@ def require_access_token(authorization: str | None = Header(default=None)) -> No
     if not expected:
         raise HTTPException(
             status_code=503,
-            detail="AROX is not configured yet. Set AROX_ACCESS_TOKEN in the service environment.",
+            detail="KPMC AI API is not configured. Set AROX_ACCESS_TOKEN in the service environment.",
         )
     scheme, _, supplied = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not supplied or not hmac.compare_digest(supplied, expected):
@@ -42,23 +44,49 @@ def require_access_token(authorization: str | None = Header(default=None)) -> No
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "arox-api", "version": "0.2.0"}
+    return {"status": "ok", "service": "kpmc-ai-api", "version": "0.3.0"}
 
 
 @app.get("/api/providers", dependencies=[Depends(require_access_token)])
 def providers() -> dict[str, object]:
-    """Return configured provider names without exposing credentials."""
+    """Describe chat tabs and their configured state without exposing credentials."""
     configured = {
         "freellmapi": bool(os.getenv("FREELLMAPI_BASE_URL", "").strip()),
         "omniroute": bool(os.getenv("OMNIROUTE_BASE_URL", "").strip()),
+        "godmode": bool(
+            os.getenv("GODMODE_BASE_URL", "").strip()
+            and os.getenv("GODMODE_API_KEY", "").strip()
+        ),
         "claude": bool(os.getenv("ANTHROPIC_API_KEY", "").strip()),
         "openai": bool(os.getenv("OPENAI_API_KEY", "").strip()),
+    }
+    labels = {
+        "freellmapi": "FreeLLMAPI",
+        "omniroute": "OmniRoute",
+        "godmode": "GodMode",
+        "claude": "Claude",
+        "openai": "OpenAI",
+    }
+    descriptions = {
+        "freellmapi": "Chat through the FreeLLMAPI gateway and its configured model pool.",
+        "omniroute": "Chat through the configured OmniRoute-compatible endpoint.",
+        "godmode": "Chat through a separately configured GodMode-compatible endpoint; configure only after its API contract is verified.",
+        "claude": "Direct Claude chat API.",
+        "openai": "Direct OpenAI chat API.",
     }
     return {
         "default": "auto",
         "routing": "free-first",
+        "scope": "chat-only",
         "providers": [
-            {"id": name, "configured": is_configured}
+            {
+                "id": name,
+                "label": labels[name],
+                "configured": is_configured,
+                "available": is_configured,
+                "features": ["chat"],
+                "description": descriptions[name],
+            }
             for name, is_configured in configured.items()
         ],
     }
