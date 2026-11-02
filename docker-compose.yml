@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aws_ai_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-app_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      - ./migrations/022_ai_workforce.sql:/docker-entrypoint-initdb.d/022_ai_workforce.sql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: aws_ai_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: aws_ai_n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aws_ai_orchestrator
+    ports:
+      - "8000:8000"
+    environment:
+      - DEPLOYMENT_ENV=cloud
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-app_db}
+      - REDIS_URL=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - CLOUD_API_KEY=${CLOUD_API_KEY:-}
+      - CLOUD_GATEWAY_URL=${CLOUD_GATEWAY_URL:-https://api.groq.com/openai/v1}
+      - CLOUD_MODEL_NAME=${CLOUD_MODEL_NAME:-llama-3.3-70b-versatile}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
