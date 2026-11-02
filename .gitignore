@@ -1,0 +1,11 @@
+.env
+*.pem
+*.key
+pgdata/
+redis_data/
+n8n_data/
+local_ollama_weights/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
