@@ -1,15 +1,15 @@
 import os
-import httpx
+from typing import Optional
 import asyncpg
 from fastapi import FastAPI, HTTPException
+import httpx
 from pydantic import BaseModel
-from typing import Optional
 
 app = FastAPI(title="AI Workforce Dual Orchestrator", version="2.0.0")
 
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV", "cloud")
 DB_HOST = os.getenv("DB_HOST", "postgres")
-DB_PORT = int(os.getenv("DB_PORT", 5432))
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_USER = os.getenv("DB_USER", "admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "localpassword")
 DB_NAME = os.getenv("DB_NAME", "app_db")
@@ -22,6 +22,7 @@ CLOUD_GATEWAY_URL = os.getenv("CLOUD_GATEWAY_URL", "https://api.groq.com/openai/
 CLOUD_API_KEY = os.getenv("CLOUD_API_KEY", "")
 CLOUD_MODEL_NAME = os.getenv("CLOUD_MODEL_NAME", "llama-3.3-70b-versatile")
 
+
 async def get_db_pool():
     ssl_setting = True if DB_SSLMODE == "require" else None
     return await asyncpg.create_pool(
@@ -32,26 +33,35 @@ async def get_db_pool():
         database=DB_NAME,
         ssl=ssl_setting,
         min_size=1,
-        max_size=5
+        max_size=5,
     )
+
 
 class TaskDispatch(BaseModel):
     requester: str = "Owner"
     instruction: str
     force_local_ram: Optional[bool] = None
 
+
 @app.get("/")
 def get_status():
     return {
         "status": "online",
         "environment": DEPLOYMENT_ENV,
-        "compute_engine": "Host Physical RAM (Ollama)" if DEPLOYMENT_ENV == "local_hardware" else "Cloud Providers",
-        "state_connected_db": f"{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        "compute_engine": (
+            "Host Physical RAM (Ollama)"
+            if DEPLOYMENT_ENV == "local_hardware"
+            else "Cloud Providers"
+        ),
+        "state_connected_db": f"{DB_HOST}:{DB_PORT}/{DB_NAME}",
     }
+
 
 @app.post("/ai/dispatch")
 async def dispatch_task(task: TaskDispatch):
-    use_local_compute = (DEPLOYMENT_ENV == "local_hardware" or task.force_local_ram is True)
+    use_local_compute = (
+        DEPLOYMENT_ENV == "local_hardware" or task.force_local_ram is True
+    )
 
     prompt = f"""System: You are the Chief of Staff agent.
 Classify this task into its department (CTO, COO, CFO, HR, Legal, Personal).
@@ -75,14 +85,15 @@ Provide a clear, structured JSON-ready plan."""
                     json={
                         "model": LOCAL_MODEL_NAME,
                         "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.2
-                    }
+                        "temperature": 0.2,
+                    },
                 )
                 if res.status_code == 200:
                     analysis_text = res.json()["choices"][0]["message"]["content"]
                     executed_by = f"local_ram ({LOCAL_MODEL_NAME})"
                 else:
-                    raise Exception(f"Local Ollama error code: {res.status_code}")
+                    err_msg = f"Local Ollama error code: {res.status_code}"
+                    raise RuntimeError(err_msg)
         except Exception as e:
             if CLOUD_API_KEY:
                 async with httpx.AsyncClient(timeout=45.0) as client:
@@ -92,13 +103,15 @@ Provide a clear, structured JSON-ready plan."""
                         json={
                             "model": CLOUD_MODEL_NAME,
                             "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.2
-                        }
+                            "temperature": 0.2,
+                        },
                     )
                     analysis_text = res.json()["choices"][0]["message"]["content"]
                     executed_by = f"cloud_fallback_token ({CLOUD_MODEL_NAME})"
             else:
-                raise HTTPException(status_code=500, detail=f"Local execution failed: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Local execution failed: {e!s}"
+                ) from e
     else:
         async with httpx.AsyncClient(timeout=45.0) as client:
             res = await client.post(
@@ -107,8 +120,8 @@ Provide a clear, structured JSON-ready plan."""
                 json={
                     "model": CLOUD_MODEL_NAME,
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
-                }
+                    "temperature": 0.2,
+                },
             )
             analysis_text = res.json()["choices"][0]["message"]["content"]
             executed_by = f"cloud_api ({CLOUD_MODEL_NAME})"
@@ -126,7 +139,7 @@ Provide a clear, structured JSON-ready plan."""
                 "task_analyzed",
                 "orchestrator",
                 None,
-                {"requester": task.requester, "plan": analysis_text}
+                {"requester": task.requester, "plan": analysis_text},
             )
         await pool.close()
     except Exception as db_err:
@@ -135,6 +148,10 @@ Provide a clear, structured JSON-ready plan."""
     return {
         "status": "success",
         "engine_used": executed_by,
-        "hardware_location": "Host Physical RAM" if "local_ram" in executed_by else "Cloud Provider",
-        "chief_of_staff_plan": analysis_text
+        "hardware_location": (
+            "Host Physical RAM"
+            if "local_ram" in executed_by
+            else "Cloud Provider"
+        ),
+        "chief_of_staff_plan": analysis_text,
     }
