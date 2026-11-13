@@ -66,7 +66,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:?missing}
       - DB_NAME=${DB_NAME:-app_db}
       - REDIS_URL=redis://redis:6379/0
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - APPROVER_KEY=${APPROVER_KEY:?missing}
       - CLOUD_API_KEY=${CLOUD_API_KEY:-}
       - CLOUD_GATEWAY_URL=${CLOUD_GATEWAY_URL:-https://api.groq.com/openai/v1}
       - CLOUD_MODEL_NAME=${CLOUD_MODEL_NAME:-openai/gpt-oss-120b}
@@ -79,6 +79,18 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks: [internal]
+    restart: unless-stopped
+
+  bot:
+    build: {context: ./bot}
+    container_name: aws_ai_bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?missing}
+      - OWNER_TELEGRAM_ID=${OWNER_TELEGRAM_ID:?missing}
+      - APPROVER_KEY=${APPROVER_KEY:?missing}
+    depends_on:
+      orchestrator: {condition: service_healthy}
     networks: [internal]
     restart: unless-stopped
 

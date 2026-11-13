@@ -6,7 +6,7 @@ from typing import Optional
 
 import asyncpg
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 DEPLOYMENT_ENV = os.getenv("DEPLOYMENT_ENV", "cloud")
@@ -16,6 +16,7 @@ DB_USER = os.getenv("DB_USER", "admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "app_db")
 API_KEY = os.getenv("API_KEY", "")
+APPROVER_KEY = os.getenv("APPROVER_KEY", "")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434/v1")
 LOCAL_MODEL_NAME = os.getenv("LOCAL_MODEL_NAME", "qwen2.5:7b")
@@ -24,10 +25,19 @@ CLOUD_API_KEY = os.getenv("CLOUD_API_KEY", "")
 CLOUD_MODEL_NAME = os.getenv("CLOUD_MODEL_NAME", "llama-3.3-70b-versatile")
 
 
-def require_key(x_api_key: str = Header(default="")):
-    if not API_KEY or not hmac.compare_digest(
-        x_api_key.encode(), API_KEY.encode()
-    ):
+def require_key(request: Request, x_api_key: str = Header(default="")):
+    path = request.url.path
+    if request.method == "POST" and path.startswith("/approvals/"):
+        allowed = [APPROVER_KEY]
+    elif request.method == "GET" and path == "/approvals":
+        allowed = [API_KEY, APPROVER_KEY]
+    else:
+        allowed = [API_KEY]
+    ok = False
+    for k in allowed:
+        if k and hmac.compare_digest(x_api_key.encode(), k.encode()):
+            ok = True
+    if not ok:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
