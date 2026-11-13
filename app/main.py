@@ -237,3 +237,6 @@ async def dispatch_task(task: TaskDispatch):
     await audit(f"Chief_of_Staff [{engine}]", "task_analyzed", "orchestrator",
                 None, {"requester": task.requester, "plan": text})
     return {"status": "success", "engine_used": engine, "chief_of_staff_plan": text}
+
+from app.skills_agents import router as sa_router  # noqa: E402
+app.include_router(sa_router)
