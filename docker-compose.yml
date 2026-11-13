@@ -1,61 +1,90 @@
 services:
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: arox_caddy
+    ports: ["80:80", "443:443"]
+    environment:
+      - API_KEY=${API_KEY:?missing}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      orchestrator: {condition: service_healthy}
+    networks: [web, internal]
+    restart: unless-stopped
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: aws_ai_postgres
     environment:
       POSTGRES_USER: ${DB_USER:-admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?missing}
       POSTGRES_DB: ${DB_NAME:-app_db}
-    ports:
-      - "5432:5432"
     volumes:
       - ./pgdata:/var/lib/postgresql/data
       - ./migrations/022_ai_workforce.sql:/docker-entrypoint-initdb.d/022_ai_workforce.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-app_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: aws_ai_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - ./redis_data:/data
+    volumes: ["./redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [internal]
     restart: unless-stopped
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:1.76.1
     container_name: aws_ai_n8n
-    ports:
-      - "5678:5678"
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?missing}
+      - N8N_SECURE_COOKIE=false
       - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
-    volumes:
-      - ./n8n_data:/home/node/.n8n
+    volumes: ["./n8n_data:/home/node/.n8n"]
+    networks: [internal]
     restart: unless-stopped
 
   orchestrator:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: {context: ., dockerfile: Dockerfile}
     container_name: aws_ai_orchestrator
-    ports:
-      - "8000:8000"
     environment:
       - DEPLOYMENT_ENV=cloud
+      - API_KEY=${API_KEY:?missing}
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER:-admin}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PASSWORD=${DB_PASSWORD:?missing}
       - DB_NAME=${DB_NAME:-app_db}
       - REDIS_URL=redis://redis:6379/0
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - CLOUD_API_KEY=${CLOUD_API_KEY:-}
       - CLOUD_GATEWAY_URL=${CLOUD_GATEWAY_URL:-https://api.groq.com/openai/v1}
-      - CLOUD_MODEL_NAME=${CLOUD_MODEL_NAME:-llama-3.3-70b-versatile}
+      - CLOUD_MODEL_NAME=${CLOUD_MODEL_NAME:-openai/gpt-oss-120b}
     depends_on:
-      - postgres
-      - redis
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/docs"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [internal]
     restart: unless-stopped
+
+networks:
+  web:
+  internal:
+    internal: false
+volumes:
+  caddy_data:

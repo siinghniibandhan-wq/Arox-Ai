@@ -9,3 +9,9 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+pgdata/
+redis_data/
+n8n_data/
+*.bak
+.env

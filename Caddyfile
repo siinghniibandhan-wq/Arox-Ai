@@ -1,0 +1,5 @@
+:80 {
+    @noauth not header X-API-Key {env.API_KEY}
+    respond @noauth "Unauthorized" 401
+    reverse_proxy orchestrator:8000
+}
