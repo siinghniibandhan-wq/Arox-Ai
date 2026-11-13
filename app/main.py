@@ -27,6 +27,8 @@ CLOUD_MODEL_NAME = os.getenv("CLOUD_MODEL_NAME", "llama-3.3-70b-versatile")
 
 def require_key(request: Request, x_api_key: str = Header(default="")):
     path = request.url.path
+    if request.method == "POST" and path in ("/login", "/chat", "/logout"):
+        return
     if request.method == "POST" and path.startswith("/approvals/"):
         allowed = [APPROVER_KEY]
     elif request.method == "GET" and path == "/approvals":
@@ -250,3 +252,6 @@ async def dispatch_task(task: TaskDispatch):
 
 from app.skills_agents import router as sa_router  # noqa: E402
 app.include_router(sa_router)
+
+from app.chat import router as chat_router  # noqa: E402
+app.include_router(chat_router)

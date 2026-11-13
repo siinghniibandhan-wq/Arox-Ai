@@ -7,6 +7,7 @@ services:
       - API_KEY=${API_KEY:?missing}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
       - caddy_data:/data
     depends_on:
       orchestrator: {condition: service_healthy}
@@ -70,6 +71,7 @@ services:
       - CLOUD_API_KEY=${CLOUD_API_KEY:-}
       - CLOUD_GATEWAY_URL=${CLOUD_GATEWAY_URL:-https://api.groq.com/openai/v1}
       - CLOUD_MODEL_NAME=${CLOUD_MODEL_NAME:-openai/gpt-oss-120b}
+      - CHAT_PASSWORD=${CHAT_PASSWORD:?missing}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+<title>Arox</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#0f172a;color:#e2e8f0;font:16px system-ui,sans-serif;display:flex;flex-direction:column}
+#login,#app{display:none;flex:1;flex-direction:column;padding:12px;min-height:0}
+#log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.m{padding:10px 12px;border-radius:10px;max-width:88%;white-space:pre-wrap;word-break:break-word}
+.u{background:#2563eb;align-self:flex-end}
+.b{background:#1e293b;align-self:flex-start}
+.row{display:flex;gap:8px;margin-top:8px}
+input{flex:1;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px}
+button{padding:12px 16px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:16px}
+#err{color:#f87171;margin-top:8px;min-height:1.2em}
+</style></head><body>
+<div id="login">
+<h2>Arox</h2>
+<div class="row"><input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+<button id="go">Login</button></div>
+<div id="err"></div>
+</div>
+<div id="app">
+<div id="log"></div>
+<div class="row"><input id="msg" placeholder="Message">
+<button id="send">Send</button><button id="out">Out</button></div>
+</div>
+<script>
+var T = null;
+function $(i){return document.getElementById(i);}
+function show(){
+  $("login").style.display = T ? "none" : "flex";
+  $("app").style.display = T ? "flex" : "none";
+}
+function add(cls, text){
+  var d = document.createElement("div");
+  d.className = "m " + cls;
+  d.textContent = text;
+  $("log").appendChild(d);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+async function post(path, body, hdr){
+  var h = {"Content-Type": "application/json"};
+  if (hdr) h["X-Session"] = hdr;
+  var r = await fetch(path, {method: "POST", headers: h, body: JSON.stringify(body || {})});
+  var j = {};
+  try { j = await r.json(); } catch (e) {}
+  return {ok: r.ok, status: r.status, j: j};
+}
+async function login(){
+  $("err").textContent = "";
+  var r = await post("/login", {password: $("pw").value});
+  $("pw").value = "";
+  if (r.ok) { T = r.j.token; show(); }
+  else { $("err").textContent = r.status == 429 ? "Too many attempts. Try later." : "Wrong password."; }
+}
+async function send(){
+  var t = $("msg").value.trim();
+  if (!t) return;
+  $("msg").value = "";
+  add("u", t);
+  var r = await post("/chat", {message: t}, T);
+  if (r.status == 401) { T = null; show(); return; }
+  add("b", r.ok ? r.j.reply : "Error " + r.status);
+}
+async function out(){
+  await post("/logout", {}, T);
+  T = null; $("log").innerHTML = ""; show();
+}
+$("go").onclick = login;
+$("send").onclick = send;
+$("out").onclick = out;
+$("pw").onkeydown = function(e){ if (e.key == "Enter") login(); };
+$("msg").onkeydown = function(e){ if (e.key == "Enter") send(); };
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+show();
+</script></body></html>
