@@ -206,10 +206,21 @@ class TaskDispatch(BaseModel):
     force_local_ram: Optional[bool] = None
 
 
-async def call_model(prompt: str, use_local: bool):
+OMNIROUTE_URL = os.getenv("OMNIROUTE_URL", "http://omniroute:20128/v1")
+OMNIROUTE_API_KEY = os.getenv("OMNIROUTE_API_KEY", "")
+OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "arox-smart")
+ROUTE_DEFAULT = os.getenv("ROUTE_DEFAULT", "auto")
+
+
+async def call_model(prompt: str, use_local: bool, route: str = None):
     targets = []
+    rt = (route or ROUTE_DEFAULT).lower()
     if use_local:
         targets.append((OLLAMA_BASE_URL, {}, LOCAL_MODEL_NAME, "local_ram"))
+    if rt in ("smart", "auto") and OMNIROUTE_API_KEY:
+        targets.append((OMNIROUTE_URL,
+                        {"Authorization": f"Bearer {OMNIROUTE_API_KEY}"},
+                        OMNIROUTE_MODEL, "omniroute"))
     if CLOUD_API_KEY:
         for mn in dict.fromkeys([CLOUD_MODEL_NAME] + CLOUD_FALLBACKS):
             targets.append((CLOUD_GATEWAY_URL,
@@ -220,7 +231,7 @@ async def call_model(prompt: str, use_local: bool):
     last = None
     for url, headers, model, label in targets:
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=(25.0 if label == "omniroute" else 60.0)) as client:
                 r = await client.post(
                     f"{url}/chat/completions", headers=headers,
                     json={"model": model, "temperature": 0.2,
