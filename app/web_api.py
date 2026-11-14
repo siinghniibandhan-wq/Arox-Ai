@@ -110,3 +110,87 @@ async def web_chat_one(chat_id: str, request: Request,
             "SELECT role, text, engine, created_at FROM ai.chat_messages"
             " WHERE session_id = $1 ORDER BY id LIMIT 500", sid)
     return [dict(r) for r in rows]
+
+
+# ---- Agents: write endpoints (session protected) ----
+from pydantic import BaseModel, Field  # noqa: E402
+
+from app.skills_agents import AgentIn, RunIn, SCOPES, create_agent, run_agent  # noqa: E402
+
+
+class AgentEditIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    job: str | None = Field(default=None, min_length=1, max_length=4000)
+    skills: list[str] | None = None
+    memory_scope: str | None = None
+    is_active: bool | None = None
+
+
+@router.post("/web/agents")
+async def web_agent_create(a: AgentIn, request: Request,
+                           x_session: str = Header(default="")):
+    from app.main import audit
+    await need_session(x_session)
+    r = await create_agent(a, request)
+    await audit("Owner (web)", "agent_create", r["id"], None,
+                {"name": a.name, "skills": a.skills,
+                 "memory_scope": a.memory_scope})
+    return r
+
+
+@router.post("/web/agents/{agent_id}")
+async def web_agent_edit(agent_id: str, e: AgentEditIn, request: Request,
+                         x_session: str = Header(default="")):
+    from app.main import audit
+    await need_session(x_session)
+    try:
+        uuid.UUID(agent_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="No such agent")
+    if e.memory_scope is not None and e.memory_scope not in SCOPES:
+        raise HTTPException(status_code=400, detail="Bad memory_scope")
+    async with request.app.state.pool.acquire() as c:
+        old = await c.fetchrow(
+            "SELECT name, system_prompt, skills, memory_scope, is_active"
+            " FROM ai.agents WHERE id = $1::uuid", agent_id)
+        if not old:
+            raise HTTPException(status_code=404, detail="No such agent")
+        skills = e.skills if e.skills is not None else json.loads(old["skills"])
+        if e.skills is not None:
+            known = await c.fetch(
+                "SELECT name FROM ai.skills WHERE name = ANY($1::text[])", skills)
+            missing = set(skills) - {r["name"] for r in known}
+            if missing:
+                raise HTTPException(
+                    status_code=400, detail=f"Unknown skills: {sorted(missing)}")
+        new = {
+            "name": e.name if e.name is not None else old["name"],
+            "job": e.job if e.job is not None else old["system_prompt"],
+            "skills": skills,
+            "memory_scope": (e.memory_scope if e.memory_scope is not None
+                             else old["memory_scope"]),
+            "is_active": (e.is_active if e.is_active is not None
+                          else old["is_active"]),
+        }
+        await c.execute(
+            "UPDATE ai.agents SET name=$2, system_prompt=$3, skills=$4::jsonb,"
+            " memory_scope=$5, is_active=$6 WHERE id=$1::uuid",
+            agent_id, new["name"], new["job"], json.dumps(skills),
+            new["memory_scope"], new["is_active"])
+    await audit("Owner (web)", "agent_edit", agent_id,
+                {"name": old["name"], "job": old["system_prompt"][:300],
+                 "skills": json.loads(old["skills"]),
+                 "memory_scope": old["memory_scope"],
+                 "is_active": old["is_active"]},
+                {"name": new["name"], "job": new["job"][:300],
+                 "skills": skills, "memory_scope": new["memory_scope"],
+                 "is_active": new["is_active"]})
+    return {"id": agent_id, "name": new["name"]}
+
+
+@router.post("/web/agents/{agent_id}/run")
+async def web_agent_run(agent_id: str, body: RunIn, request: Request,
+                        x_session: str = Header(default="")):
+    await need_session(x_session)
+    body.requester = "Owner (web)"
+    return await run_agent(agent_id, body, request)

@@ -8,7 +8,7 @@ aroxai.duckdns.org {
         path / /manifest.json /sw.js
     }
     @web {
-        method GET
+        method GET POST
         path /web/*
     }
     handle @web {

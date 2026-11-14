@@ -30,7 +30,7 @@ def require_key(request: Request, x_api_key: str = Header(default="")):
     path = request.url.path
     if request.method == "POST" and path in ("/login", "/chat", "/logout", "/bot/chat"):
         return
-    if request.method == "GET" and path.startswith("/web/"):
+    if request.method in ("GET", "POST") and path.startswith("/web/"):
         return
     if request.method == "POST" and path.startswith("/approvals/"):
         allowed = [APPROVER_KEY]

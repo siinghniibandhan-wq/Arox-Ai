@@ -351,9 +351,10 @@ async function load(n){
   } else {
     if (n == "activity" && td) d = d.filter(function(x){ return new Date(x.created_at).toDateString() == new Date().toDateString(); });
     if (n == "approvals") h = '<button class="ghost tg" onclick="togAll()">' + (apAll ? "Show pending only" : "Show all") + '</button>';
+    if (n == "agents") { window.AG = d; h = '<button class="ghost tg" onclick="agNew()">+ New agent</button><div id="agout"></div>'; }
     if (!d.length) h += "<p>Nothing to show.</p>";
     d.forEach(function(x){
-      if (n == "agents") h += item('<b>' + e2(x.name) + '</b>' + (x.is_active ? "" : " (inactive)"), e2(x.job) + '<br>Skills: ' + e2((x.skills || []).join(", ") || "none"));
+      if (n == "agents") h += item('<b>' + e2(x.name) + '</b>' + (x.is_active ? "" : " (inactive)"), e2(x.job) + '<br>Skills: ' + e2((x.skills || []).join(", ") || "none") + agBtns(x));
       else if (n == "skills") h += item('<b>' + e2(x.name) + '</b> v' + e2(x.version), e2(x.description));
       else if (n == "activity") h += item('<b>' + e2(x.action) + '</b>', e2(when(x.created_at)) + ' · ' + e2(x.actor) + (x.target ? ' · ' + e2(x.target) : '') + (x.after ? '<br>' + e2(x.after) : ''));
       else h += item('<b>' + e2(x.tool) + '</b> · Level ' + e2(x.level) + ' · ' + e2(x.status), e2(x.requester) + ' · ' + e2(when(x.created_at)) + (x.args ? '<br>' + e2(x.args) : ''));
@@ -444,4 +445,50 @@ async function openChat(id){
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 show();
+/* ---- Agents tab: write actions ---- */
+function agTok(){ return typeof T != "undefined" ? T : ""; }
+function agSk(s){ return String(s || "").split(",").map(function(x){ return x.trim(); }).filter(Boolean); }
+function agFind(id){ return (window.AG || []).filter(function(a){ return a.id == id; })[0]; }
+async function agSend(path, body){
+  var r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Session": agTok()}, body: JSON.stringify(body)});
+  var j = {};
+  try { j = await r.json(); } catch(e) {}
+  if (!r.ok) throw new Error(typeof j.detail == "string" ? j.detail : "Error " + r.status);
+  return j;
+}
+function agBtns(a){
+  return '<br><button class="ghost tg" onclick="agRun(\'' + a.id + '\')">Run</button> <button class="ghost tg" onclick="agEdit(\'' + a.id + '\')">Edit</button> <button class="ghost tg" onclick="agToggle(\'' + a.id + '\')">' + (a.is_active ? "Deactivate" : "Activate") + '</button>';
+}
+async function agNew(){
+  var name = prompt("Agent name"); if (!name) return;
+  var job = prompt("What is this agent's job?"); if (!job) return;
+  var sk = prompt("Skills (comma separated, or leave empty)", ""); if (sk === null) return;
+  var sc = prompt("Memory scope: business, personal or global", "business"); if (!sc) return;
+  try { await agSend("/web/agents", {name: name.trim(), job: job.trim(), skills: agSk(sk), memory_scope: sc.trim()}); load("agents"); }
+  catch(e) { alert(e.message); }
+}
+async function agEdit(id){
+  var a = agFind(id); if (!a) return;
+  var name = prompt("Agent name", a.name); if (name === null) return;
+  var job = prompt("Job", a.job); if (job === null) return;
+  var sk = prompt("Skills (comma separated)", (a.skills || []).join(", ")); if (sk === null) return;
+  var sc = prompt("Memory scope: business, personal or global", a.memory_scope); if (sc === null) return;
+  try { await agSend("/web/agents/" + id, {name: name.trim() || a.name, job: job.trim() || a.job, skills: agSk(sk), memory_scope: sc.trim() || a.memory_scope}); load("agents"); }
+  catch(e) { alert(e.message); }
+}
+async function agToggle(id){
+  var a = agFind(id); if (!a) return;
+  if (!confirm((a.is_active ? "Deactivate " : "Activate ") + a.name + "?")) return;
+  try { await agSend("/web/agents/" + id, {is_active: !a.is_active}); load("agents"); }
+  catch(e) { alert(e.message); }
+}
+async function agRun(id){
+  var a = agFind(id); if (!a) return;
+  var ins = prompt("Instruction for " + a.name + " (it returns a plan only)"); if (!ins) return;
+  var out = $("agout"); if (!out) return;
+  out.innerHTML = item("<b>" + e2(a.name) + "</b>", "Running…");
+  try { var r = await agSend("/web/agents/" + id + "/run", {instruction: ins}); out.innerHTML = item("<b>" + e2(r.agent) + "</b> · " + e2(r.engine_used), '<span style="white-space:pre-wrap">' + e2(r.reply) + "</span>"); }
+  catch(e) { out.innerHTML = item("<b>Error</b>", e2(e.message)); }
+}
+
 </script></body></html>
