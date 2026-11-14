@@ -105,8 +105,21 @@ async def t_deploy_stub(args):
     return {"note": "stub: nothing was deployed"}
 
 
+async def t_list_pending(args):
+    async with app.state.pool.acquire() as c:
+        rows = await c.fetch(
+            "SELECT id, tool, level, requester, created_at"
+            " FROM ai.pending_actions WHERE status='pending'"
+            " ORDER BY id DESC LIMIT 20")
+    return {"pending": [
+        {"id": r["id"], "tool": r["tool"], "level": r["level"],
+         "requester": r["requester"], "created_at": r["created_at"].isoformat()}
+        for r in rows]}
+
+
 TOOLS = {
     "draft_note": (1, t_draft_note),
+    "list_pending_approvals": (1, t_list_pending),
     "send_message": (2, t_send_message),
     "deploy_stub": (3, t_deploy_stub),
 }
