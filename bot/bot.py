@@ -4,11 +4,13 @@ import httpx
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 OWNER = int(os.environ["OWNER_TELEGRAM_ID"])
 KEY = os.environ["APPROVER_KEY"]
+BOT_KEY = os.environ.get("BOT_CHAT_KEY", "")
 API = "http://orchestrator:8000"
 TG = f"https://api.telegram.org/bot{TOKEN}"
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("arox-bot")
 seen = set()
+route = {"v": ""}
 
 
 async def tg(c, method, **data):
@@ -77,6 +79,26 @@ async def on_callback(c, cq):
     await tg(c, "sendMessage", chat_id=OWNER, text=f"#{aid}: {msg}")
 
 
+async def bot_chat(c, text):
+    if not BOT_KEY:
+        await tg(c, "sendMessage", chat_id=OWNER, text="Chat key not set.")
+        return
+    try:
+        r = await c.post(API + "/bot/chat",
+                         json={"message": text[:4000], "route": route["v"]},
+                         headers={"X-Bot-Key": BOT_KEY}, timeout=90)
+        if r.status_code == 200:
+            d = r.json()
+            out = "%s\n\n[%s]" % (d.get("reply", ""), d.get("engine_used", ""))
+        elif r.status_code == 429:
+            out = "Daily chat limit reached."
+        else:
+            out = "Chat failed (%s)" % r.status_code
+    except Exception as e:
+        out = "Chat error: " + type(e).__name__
+    await tg(c, "sendMessage", chat_id=OWNER, text=out[:4000])
+
+
 async def main():
     async with httpx.AsyncClient() as c:
         await tg(c, "deleteWebhook", drop_pending_updates=True)
@@ -93,8 +115,19 @@ async def main():
                         m = u["message"]
                         if m.get("from", {}).get("id") != OWNER:
                             continue
-                        if m.get("text", "").startswith(("/pending", "/start")):
+                        txt = m.get("text", "")
+                        if txt.startswith(("/pending", "/start")):
                             await show_pending(c)
+                        elif txt.startswith("/route"):
+                            arg = txt.partition(" ")[2].strip().lower()
+                            if arg in ("direct", "smart", "auto"):
+                                route["v"] = arg
+                            await tg(c, "sendMessage", chat_id=OWNER,
+                                     text="Route: " + (route["v"] or "default"))
+                        elif txt and not txt.startswith("/"):
+                            await tg(c, "sendChatAction", chat_id=OWNER,
+                                     action="typing")
+                            await bot_chat(c, txt)
             except Exception as e:
                 log.warning("loop error: %s", type(e).__name__)
                 await asyncio.sleep(5)

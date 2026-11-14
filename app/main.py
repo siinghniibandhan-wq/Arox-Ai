@@ -28,7 +28,7 @@ CLOUD_FALLBACKS = [m.strip() for m in os.getenv("CLOUD_FALLBACK_MODELS", "openai
 
 def require_key(request: Request, x_api_key: str = Header(default="")):
     path = request.url.path
-    if request.method == "POST" and path in ("/login", "/chat", "/logout"):
+    if request.method == "POST" and path in ("/login", "/chat", "/logout", "/bot/chat"):
         return
     if request.method == "POST" and path.startswith("/approvals/"):
         allowed = [APPROVER_KEY]
