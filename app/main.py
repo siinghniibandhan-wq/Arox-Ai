@@ -22,7 +22,8 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434/v1")
 LOCAL_MODEL_NAME = os.getenv("LOCAL_MODEL_NAME", "qwen2.5:7b")
 CLOUD_GATEWAY_URL = os.getenv("CLOUD_GATEWAY_URL", "https://api.groq.com/openai/v1")
 CLOUD_API_KEY = os.getenv("CLOUD_API_KEY", "")
-CLOUD_MODEL_NAME = os.getenv("CLOUD_MODEL_NAME", "llama-3.3-70b-versatile")
+CLOUD_MODEL_NAME = os.getenv("CLOUD_MODEL_NAME", "openai/gpt-oss-120b")
+CLOUD_FALLBACKS = [m.strip() for m in os.getenv("CLOUD_FALLBACK_MODELS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
 
 
 def require_key(request: Request, x_api_key: str = Header(default="")):
@@ -210,9 +211,10 @@ async def call_model(prompt: str, use_local: bool):
     if use_local:
         targets.append((OLLAMA_BASE_URL, {}, LOCAL_MODEL_NAME, "local_ram"))
     if CLOUD_API_KEY:
-        targets.append((CLOUD_GATEWAY_URL,
-                        {"Authorization": f"Bearer {CLOUD_API_KEY}"},
-                        CLOUD_MODEL_NAME, "cloud_api"))
+        for mn in dict.fromkeys([CLOUD_MODEL_NAME] + CLOUD_FALLBACKS):
+            targets.append((CLOUD_GATEWAY_URL,
+                            {"Authorization": f"Bearer {CLOUD_API_KEY}"},
+                            mn, "cloud_api"))
     if not targets:
         raise HTTPException(status_code=503, detail="No model configured")
     last = None
