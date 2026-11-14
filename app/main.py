@@ -30,6 +30,8 @@ def require_key(request: Request, x_api_key: str = Header(default="")):
     path = request.url.path
     if request.method == "POST" and path in ("/login", "/chat", "/logout", "/bot/chat"):
         return
+    if request.method == "GET" and path.startswith("/web/"):
+        return
     if request.method == "POST" and path.startswith("/approvals/"):
         allowed = [APPROVER_KEY]
     elif request.method == "GET" and path == "/approvals":
@@ -281,3 +283,6 @@ app.include_router(sa_router)
 
 from app.chat import router as chat_router  # noqa: E402
 app.include_router(chat_router)
+
+from app.web_api import router as web_router  # noqa: E402
+app.include_router(web_router)

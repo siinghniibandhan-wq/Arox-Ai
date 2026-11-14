@@ -93,6 +93,7 @@ i[data-i]{display:inline-grid;place-items:center}
 #app{transition:margin-left .25s ease}
 @media(min-width:900px){body.dro #scrim{opacity:0;pointer-events:none}body.dro #app{margin-left:276px}}
 @media(prefers-reduced-motion:reduce){#dr,#scrim,#app{transition:none!important}}
+.view .it{text-align:left;padding:12px 14px;margin:0 0 10px;border:1px solid var(--gb);border-radius:14px;background:rgba(127,127,127,.08)}.view .it b{color:var(--text)}.view .it small{display:block;margin-top:4px;color:var(--mute);word-break:break-word}.view .kv{display:flex;justify-content:space-between;gap:12px}.view .kv span{color:var(--mute)}.view .tg{margin:0 0 12px}
 </style></head><body>
 <div id="login">
 <form class="card" id="lf">
@@ -110,11 +111,12 @@ i[data-i]{display:inline-grid;place-items:center}
 <div><h1>Arox</h1><small><span class="dot"></span><span id="st">Online</span></small></div>
 <select id="rt" aria-label="Route" style="background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:4px 6px;font-size:12px;margin-left:auto"><option value="">Default</option><option value="direct">Direct</option><option value="smart">Smart</option><option value="auto">Auto</option></select>
 <button class="ghost" id="out">Sign out</button></header>
-<div id="scrim"></div><aside id="dr" aria-label="Menu"><div class="dh"><div class="mark">A</div><b>Arox</b><button class="ghost" id="dx" aria-label="Close menu" style="margin-left:0;padding:8px"><i data-i="x"></i></button></div><nav id="tabs"><button class="on" data-t="chat"><i data-i="chat"></i>Chat</button><button data-t="agents"><i data-i="agents"></i>Agents</button><button data-t="skills"><i data-i="skills"></i>Skills</button><button data-t="activity"><i data-i="activity"></i>Activity</button><button data-t="approvals"><i data-i="approvals"></i>Approvals</button><p class="dl">Quick actions (soon)</p><button disabled><i data-i="pending"></i>Pending approvals</button><button disabled><i data-i="activity"></i>Today's activity</button><button disabled><i data-i="status"></i>System status</button></nav><div class="df" id="df"><small>Model route</small></div></aside>
-<div id="v_agents" class="view hide"><h2>Agents</h2><p>Coming soon: create, edit and run agents.</p></div>
-<div id="v_skills" class="view hide"><h2>Skills</h2><p>Coming soon: the central skill library.</p></div>
-<div id="v_activity" class="view hide"><h2>Activity</h2><p>Coming soon: the audit log in readable form.</p></div>
-<div id="v_approvals" class="view hide"><h2>Approvals</h2><p>Coming soon: pending approvals (approve and reject stay on Telegram).</p></div>
+<div id="scrim"></div><aside id="dr" aria-label="Menu"><div class="dh"><div class="mark">A</div><b>Arox</b><button class="ghost" id="dx" aria-label="Close menu" style="margin-left:0;padding:8px"><i data-i="x"></i></button></div><nav id="tabs"><button class="on" data-t="chat"><i data-i="chat"></i>Chat</button><button data-t="agents"><i data-i="agents"></i>Agents</button><button data-t="skills"><i data-i="skills"></i>Skills</button><button data-t="activity"><i data-i="activity"></i>Activity</button><button data-t="approvals"><i data-i="approvals"></i>Approvals</button><p class="dl">Quick actions</p><button id="q1"><i data-i="pending"></i>Pending approvals</button><button id="q2"><i data-i="activity"></i>Today's activity</button><button id="q3"><i data-i="status"></i>System status</button></nav><div class="df" id="df"><small>Model route</small></div></aside>
+<div id="v_agents" class="view hide"><h2>Agents</h2><div class="bd" id="b_agents"><p>Loading…</p></div></div>
+<div id="v_skills" class="view hide"><h2>Skills</h2><div class="bd" id="b_skills"><p>Loading…</p></div></div>
+<div id="v_activity" class="view hide"><h2>Activity</h2><div class="bd" id="b_activity"><p>Loading…</p></div></div>
+<div id="v_approvals" class="view hide"><h2>Approvals</h2><div class="bd" id="b_approvals"><p>Loading…</p></div></div>
+<div id="v_status" class="view hide"><h2>System status</h2><div class="bd" id="b_status"><p>Loading…</p></div></div>
 <div id="log"></div>
 <div class="comp" id="comp"><textarea id="msg" rows="1" placeholder="Ask or give a task"></textarea>
 <button class="send" id="send" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
@@ -295,9 +297,10 @@ function drawer(o){
 function tab(n){
   var chat = n == "chat";
   ["log", "comp"].forEach(function(i){ $(i).classList.toggle("hide", !chat); });
-  ["agents", "skills", "activity", "approvals"].forEach(function(k){ $("v_" + k).classList.toggle("hide", k != n); });
+  ["agents", "skills", "activity", "approvals", "status"].forEach(function(k){ $("v_" + k).classList.toggle("hide", k != n); });
   document.querySelectorAll("#tabs button[data-t]").forEach(function(b){ b.classList.toggle("on", b.dataset.t == n); });
   if (!wide.matches) drawer(false);
+  if (n != "chat") load(n);
 }
 document.querySelectorAll("#tabs button[data-t]").forEach(function(b){ b.onclick = function(){ tab(b.dataset.t); }; });
 $("mn").onclick = function(){ drawer(!document.body.classList.contains("dro")); };
@@ -306,6 +309,47 @@ document.addEventListener("keydown", function(e){ if (e.key == "Escape") drawer(
 var r = $("rt"); r.removeAttribute("style"); r.className = "gsel"; $("df").appendChild(r);
 var sd = null; try { sd = sessionStorage.getItem("dr"); } catch (e) {}
 drawer(sd == "1" || (sd === null && wide.matches));
+var apAll = 0, actToday = false;
+async function get(path){
+  var r;
+  try { r = await fetch(path, {headers: {"X-Session": T || ""}}); }
+  catch (e) { return {ok: false, status: 0, j: null}; }
+  var j = null;
+  try { j = await r.json(); } catch (e) {}
+  return {ok: r.ok, status: r.status, j: j};
+}
+function e2(s){ return esc(s == null ? "" : String(s)); }
+function when(t){ return t ? new Date(t).toLocaleString([], {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"}) : ""; }
+function item(head, sub){ return '<div class="it">' + head + '<small>' + sub + '</small></div>'; }
+function kv(a, b){ return '<div class="it kv"><span>' + a + '</span><b>' + e2(b) + '</b></div>'; }
+function togAll(){ apAll = apAll ? 0 : 1; load("approvals"); }
+async function load(n){
+  var box = $("b_" + n); if (!box) return;
+  var td = actToday; if (n == "activity") actToday = false;
+  box.innerHTML = "<p>Loading…</p>";
+  var path = n == "approvals" ? "/web/pending?all=" + apAll : "/web/" + n;
+  var g = await get(path);
+  if (g.status == 401) { keep(null); $("log").innerHTML = ""; show(); return; }
+  if (!g.ok || !g.j) { box.innerHTML = "<p>Could not load. Open the tab again to retry.</p>"; return; }
+  var d = g.j, h = "";
+  if (n == "status") {
+    h = kv("Database", d.database) + kv("Redis", d.redis) + kv("Pending approvals", d.pending) + kv("Agents", d.agents) + kv("Skills", d.skills) + kv("Chat today", d.chat_used_today + " / " + d.chat_daily_limit);
+  } else {
+    if (n == "activity" && td) d = d.filter(function(x){ return new Date(x.created_at).toDateString() == new Date().toDateString(); });
+    if (n == "approvals") h = '<button class="ghost tg" onclick="togAll()">' + (apAll ? "Show pending only" : "Show all") + '</button>';
+    if (!d.length) h += "<p>Nothing to show.</p>";
+    d.forEach(function(x){
+      if (n == "agents") h += item('<b>' + e2(x.name) + '</b>' + (x.is_active ? "" : " (inactive)"), e2(x.job) + '<br>Skills: ' + e2((x.skills || []).join(", ") || "none"));
+      else if (n == "skills") h += item('<b>' + e2(x.name) + '</b> v' + e2(x.version), e2(x.description));
+      else if (n == "activity") h += item('<b>' + e2(x.action) + '</b>', e2(when(x.created_at)) + ' · ' + e2(x.actor) + (x.target ? ' · ' + e2(x.target) : '') + (x.after ? '<br>' + e2(x.after) : ''));
+      else h += item('<b>' + e2(x.tool) + '</b> · Level ' + e2(x.level) + ' · ' + e2(x.status), e2(x.requester) + ' · ' + e2(when(x.created_at)) + (x.args ? '<br>' + e2(x.args) : ''));
+    });
+  }
+  box.innerHTML = h;
+}
+$("q1").onclick = function(){ apAll = 0; tab("approvals"); };
+$("q2").onclick = function(){ actToday = true; tab("activity"); };
+$("q3").onclick = function(){ tab("status"); };
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 show();
 </script></body></html>

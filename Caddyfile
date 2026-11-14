@@ -7,6 +7,13 @@ aroxai.duckdns.org {
         method GET
         path / /manifest.json /sw.js
     }
+    @web {
+        method GET
+        path /web/*
+    }
+    handle @web {
+        reverse_proxy orchestrator:8000
+    }
     handle @public {
         reverse_proxy orchestrator:8000
     }
