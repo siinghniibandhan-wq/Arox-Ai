@@ -73,12 +73,52 @@ CHAT_DAILY_LIMIT = int(_os.getenv("CHAT_DAILY_LIMIT", "200"))
 class ChatIn(BaseModel):
     message: str = Field(max_length=4000)
     route: str = Field(default="", max_length=10)
+    chat_id: str = Field(default="", max_length=64)
+
+
+async def save_turn(request, chat_id, message, res):
+    import uuid as _u
+    try:
+        async with request.app.state.pool.acquire() as c:
+            async with c.transaction():
+                sid = None
+                if chat_id:
+                    try:
+                        sid = _u.UUID(chat_id)
+                    except ValueError:
+                        sid = None
+                if sid is not None and not await c.fetchval(
+                        "SELECT 1 FROM ai.chat_sessions WHERE id = $1", sid):
+                    sid = None
+                if sid is None:
+                    sid = await c.fetchval(
+                        "INSERT INTO ai.chat_sessions (title) VALUES ($1)"
+                        " RETURNING id", message.strip()[:60] or "New chat")
+                await c.execute(
+                    "INSERT INTO ai.chat_messages (session_id, role, text)"
+                    " VALUES ($1, 'user', $2)", sid, message)
+                await c.execute(
+                    "INSERT INTO ai.chat_messages"
+                    " (session_id, role, text, engine)"
+                    " VALUES ($1, 'bot', $2, $3)",
+                    sid, res.get("reply") or "", res.get("engine_used") or "")
+                await c.execute(
+                    "UPDATE ai.chat_sessions SET updated_at = now()"
+                    " WHERE id = $1", sid)
+        return str(sid)
+    except Exception:
+        return ""
 
 
 @router.post("/chat")
-async def chat(body: ChatIn, x_session: str = Header(default="")):
+async def chat(body: ChatIn, request: Request,
+               x_session: str = Header(default="")):
     await need_session(x_session)
-    return await run_chat(body.message, body.route, "web_chat")
+    res = await run_chat(body.message, body.route, "web_chat")
+    cid = await save_turn(request, body.chat_id, body.message, res)
+    if cid:
+        res["chat_id"] = cid
+    return res
 
 
 async def run_chat(message: str, route: str, channel: str):

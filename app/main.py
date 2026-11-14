@@ -68,6 +68,28 @@ async def lifespan(app: FastAPI):
             )
             """
         )
+        await c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai.chat_sessions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title TEXT NOT NULL DEFAULT 'New chat',
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+            """
+        )
+        await c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai.chat_messages (
+                id BIGSERIAL PRIMARY KEY,
+                session_id UUID NOT NULL REFERENCES ai.chat_sessions(id) ON DELETE CASCADE,
+                role TEXT NOT NULL,
+                text TEXT NOT NULL,
+                engine TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+            """
+        )
     yield
     await app.state.pool.close()
 

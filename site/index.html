@@ -95,6 +95,7 @@ i[data-i]{display:inline-grid;place-items:center}
 @media(prefers-reduced-motion:reduce){#dr,#scrim,#app{transition:none!important}}
 .view .it{text-align:left;padding:12px 14px;margin:0 0 10px;border:1px solid var(--gb);border-radius:14px;background:rgba(127,127,127,.08)}.view .it b{color:var(--text)}.view .it small{display:block;margin-top:4px;color:var(--mute);word-break:break-word}.view .kv{display:flex;justify-content:space-between;gap:12px}.view .kv span{color:var(--mute)}.view .tg{margin:0 0 12px}
 .cb{position:relative;margin:8px 0}.cb pre{margin:0;padding:30px 12px 12px;border-radius:12px;overflow-x:auto;background:rgba(127,127,127,.14);font-size:13px;line-height:1.5}.cb pre code{background:none;padding:0;font-family:ui-monospace,Menlo,Consolas,monospace}.cb .cc{position:absolute;top:6px;right:6px;padding:3px 10px;font-size:11px;border-radius:8px;border:1px solid var(--gb);background:var(--glass);color:var(--text)}
+#cl button{display:block;text-align:left;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style></head><body>
 <div id="login">
 <form class="card" id="lf">
@@ -112,7 +113,7 @@ i[data-i]{display:inline-grid;place-items:center}
 <div><h1>Arox</h1><small><span class="dot"></span><span id="st">Online</span></small></div>
 <select id="rt" aria-label="Route" style="background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:4px 6px;font-size:12px;margin-left:auto"><option value="">Default</option><option value="direct">Direct</option><option value="smart">Smart</option><option value="auto">Auto</option></select>
 <button class="ghost" id="out">Sign out</button></header>
-<div id="scrim"></div><aside id="dr" aria-label="Menu"><div class="dh"><div class="mark">A</div><b>Arox</b><button class="ghost" id="dx" aria-label="Close menu" style="margin-left:0;padding:8px"><i data-i="x"></i></button></div><nav id="tabs"><button class="on" data-t="chat"><i data-i="chat"></i>Chat</button><button data-t="agents"><i data-i="agents"></i>Agents</button><button data-t="skills"><i data-i="skills"></i>Skills</button><button data-t="activity"><i data-i="activity"></i>Activity</button><button data-t="approvals"><i data-i="approvals"></i>Approvals</button><p class="dl">Quick actions</p><button id="q1"><i data-i="pending"></i>Pending approvals</button><button id="q2"><i data-i="activity"></i>Today's activity</button><button id="q3"><i data-i="status"></i>System status</button></nav><div class="df" id="df"><small>Model route</small></div></aside>
+<div id="scrim"></div><aside id="dr" aria-label="Menu"><div class="dh"><div class="mark">A</div><b>Arox</b><button class="ghost" id="dx" aria-label="Close menu" style="margin-left:0;padding:8px"><i data-i="x"></i></button></div><nav id="tabs"><button class="on" data-t="chat"><i data-i="chat"></i>Chat</button><button data-t="agents"><i data-i="agents"></i>Agents</button><button data-t="skills"><i data-i="skills"></i>Skills</button><button data-t="activity"><i data-i="activity"></i>Activity</button><button data-t="approvals"><i data-i="approvals"></i>Approvals</button><p class="dl">Quick actions</p><button id="q1"><i data-i="pending"></i>Pending approvals</button><button id="q2"><i data-i="activity"></i>Today's activity</button><button id="q3"><i data-i="status"></i>System status</button><p class="dl">Recent chats</p><div id="cl"></div></nav><div class="df" id="df"><small>Model route</small></div></aside>
 <div id="v_agents" class="view hide"><h2>Agents</h2><div class="bd" id="b_agents"><p>Loading…</p></div></div>
 <div id="v_skills" class="view hide"><h2>Skills</h2><div class="bd" id="b_skills"><p>Loading…</p></div></div>
 <div id="v_activity" class="view hide"><h2>Activity</h2><div class="bd" id="b_activity"><p>Loading…</p></div></div>
@@ -238,6 +239,7 @@ function show(){
   $("login").classList.toggle("hide", !!T);
   $("app").classList.toggle("hide", !T);
   if (T && !$("log").children.length) empty();
+  if (T) { pulse(); loadChats(); }
 }
 async function login(ev){
   ev.preventDefault();
@@ -261,19 +263,20 @@ async function send(){
   $("msg").value = ""; grow();
   add("u", t); typing(true);
   var rt = $("rt").value; try { sessionStorage.setItem("rt", rt); } catch (e) {}
-  var r = await postc("/chat", {message: t, route: rt}, T, ctl.signal);
+  var r = await postc("/chat", {message: t, route: rt, chat_id: CID}, T, ctl.signal);
   typing(false); LAST = t;
   if (r.status == 401) { keep(null); $("err").textContent = "Session ended. Sign in again."; show(); }
   else if (r.ok) {
     add("b", r.j.reply);
+    if (r.j.chat_id) CID = r.j.chat_id;
     $("st").textContent = (r.j.engine_used || "").replace(/^.*\(|\)$/g, "") || "Online";
   } else if (r.aborted) add("b", "Stopped.");
   else add("b", "That didn't go through (error " + r.status + "). Send it again.");
   if (r.status != 401) addRetry();
-  busy = false; CTL = null; stopMode(false); $("msg").focus(); pulse();
+  busy = false; CTL = null; stopMode(false); $("msg").focus(); pulse(); loadChats();
 }
 function out(){
-  var t = T; keep(null); $("log").innerHTML = ""; $("st").textContent = "Online"; show();
+  var t = T; CID = ""; keep(null); $("log").innerHTML = ""; $("st").textContent = "Online"; show();
   post("/logout", {}, t);
 }
 $("lf").onsubmit = login;
@@ -398,7 +401,7 @@ $("log").addEventListener("click", function(e){
 });
 function newChat(){
   if (busy) return;
-  $("log").innerHTML = ""; empty(); $("msg").value = ""; grow(); LAST = ""; tab("chat"); grow(); pulse();
+  $("log").innerHTML = ""; empty(); $("msg").value = ""; grow(); LAST = ""; CID = ""; tab("chat"); grow(); pulse(); loadChats();
 }
 var nb = document.createElement("button");
 nb.className = "ghost"; nb.id = "nc"; nb.setAttribute("aria-label", "New chat");
@@ -414,6 +417,31 @@ async function pulse(){
   document.querySelectorAll(".dot").forEach(function(d){ d.style.background = ok ? "#16a34a" : "var(--err)"; });
 }
 pulse(); setInterval(pulse, 60000);
+var CID = "";
+async function loadChats(){
+  var box = $("cl"); if (!box || !T) return;
+  var g = await get("/web/chats");
+  if (!g.ok || !g.j) return;
+  box.innerHTML = "";
+  if (!g.j.length) { box.innerHTML = '<p class="dl">No saved chats yet</p>'; return; }
+  g.j.forEach(function(c){
+    var b = document.createElement("button");
+    b.textContent = c.title;
+    if (c.id == CID) b.className = "on";
+    b.onclick = function(){ openChat(c.id); };
+    box.appendChild(b);
+  });
+}
+async function openChat(id){
+  if (busy) return;
+  var g = await get("/web/chats/" + id);
+  if (g.status == 401) { keep(null); $("log").innerHTML = ""; show(); return; }
+  if (!g.ok || !g.j) return;
+  $("log").innerHTML = ""; CID = id; LAST = "";
+  g.j.forEach(function(m){ add(m.role == "user" ? "u" : "b", m.text); if (m.role == "user") LAST = m.text; });
+  if (!g.j.length) empty();
+  tab("chat"); down(); loadChats();
+}
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 show();
 </script></body></html>

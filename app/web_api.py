@@ -1,7 +1,8 @@
 import json
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 
 from app.chat import CHAT_DAILY_LIMIT, need_session, rds
 
@@ -83,3 +84,29 @@ async def web_status(request: Request,
         out["redis"] = "error"
     out["chat_daily_limit"] = CHAT_DAILY_LIMIT
     return out
+
+
+@router.get("/web/chats")
+async def web_chats(request: Request, x_session: str = Header(default="")):
+    await need_session(x_session)
+    async with request.app.state.pool.acquire() as c:
+        rows = await c.fetch(
+            "SELECT id, title, updated_at FROM ai.chat_sessions"
+            " ORDER BY updated_at DESC LIMIT 50")
+    return [{"id": str(r["id"]), "title": r["title"],
+             "updated_at": r["updated_at"]} for r in rows]
+
+
+@router.get("/web/chats/{chat_id}")
+async def web_chat_one(chat_id: str, request: Request,
+                       x_session: str = Header(default="")):
+    await need_session(x_session)
+    try:
+        sid = uuid.UUID(chat_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+    async with request.app.state.pool.acquire() as c:
+        rows = await c.fetch(
+            "SELECT role, text, engine, created_at FROM ai.chat_messages"
+            " WHERE session_id = $1 ORDER BY id LIMIT 500", sid)
+    return [dict(r) for r in rows]
