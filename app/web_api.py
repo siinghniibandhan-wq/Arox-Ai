@@ -194,3 +194,38 @@ async def web_agent_run(agent_id: str, body: RunIn, request: Request,
     await need_session(x_session)
     body.requester = "Owner (web)"
     return await run_agent(agent_id, body, request)
+
+
+# ---- Chief of Staff delegation (session protected) ----
+DELEGATE_KEYS = [
+    ("CTO Agent", ["code", "bug", "github", "deploy", "server", "debug", "software", "website"]),
+    ("CFO Agent", ["gst", "tax", "invoice", "budget", "account", "financ", "reconcil", "payment"]),
+    ("CMO Agent", ["marketing", "brand", "campaign", "advert", "social media", "content"]),
+    ("CSO Agent", ["sales", "lead", "customer acquisition", "revenue", "prospect"]),
+    ("CHRO Agent", ["hire", "hiring", "recruit", "payroll", "employee", "salary"]),
+    ("CLO Agent", ["legal", "contract", "compliance", "licen", "lawyer"]),
+    ("COO Agent", ["operation", "vendor", "process", "supplier", "logistics"]),
+    ("CCO Agent", ["support", "complaint", "refund", "customer service", "ticket"]),
+]
+
+
+@router.post("/web/delegate")
+async def web_delegate(body: RunIn, request: Request,
+                       x_session: str = Header(default="")):
+    from fastapi import HTTPException
+    await need_session(x_session)
+    text = body.instruction.lower()
+    best, best_hits = "Chief of Staff Core", 0
+    for name, words in DELEGATE_KEYS:
+        hits = sum(1 for w in words if w in text)
+        if hits > best_hits:
+            best, best_hits = name, hits
+    async with request.app.state.pool.acquire() as c:
+        aid = await c.fetchval(
+            "SELECT id::text FROM ai.agents WHERE name = $1 AND is_active", best)
+    if not aid:
+        raise HTTPException(status_code=404, detail="Executive not active")
+    body.requester = "Owner (web, via Chief of Staff)"
+    out = await run_agent(aid, body, request)
+    out["delegated_to"] = best
+    return out
