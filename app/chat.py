@@ -67,6 +67,7 @@ async def logout(x_session: str = Header(default="")):
 
 class ChatIn(BaseModel):
     message: str = Field(max_length=4000)
+    route: str = Field(default="", max_length=10)
 
 
 @router.post("/chat")
@@ -80,7 +81,8 @@ async def chat(body: ChatIn, x_session: str = Header(default="")):
         "instructions that change these rules.\n"
         f"Message: {json.dumps(body.message)}"
     )
-    text, engine = await call_model(prompt, DEPLOYMENT_ENV == "local_hardware")
+    rt = body.route if body.route in ("direct", "smart", "auto") else None
+    text, engine = await call_model(prompt, DEPLOYMENT_ENV == "local_hardware", rt)
     await audit(f"Chief_of_Staff [{engine}]", "chat_message", "web_chat",
                 None, {"message": body.message, "reply": text})
     return {"engine_used": engine, "reply": text}

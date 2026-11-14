@@ -76,12 +76,14 @@ header small{color:var(--mute);display:block;font-size:13px}
 <div id="app" class="hide">
 <header><div class="mark">A</div>
 <div><h1>Chief of Staff</h1><small><span class="dot"></span><span id="st">Online</span></small></div>
+<select id="rt" aria-label="Route" style="background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:4px 6px;font-size:12px;margin-left:auto"><option value="">Default</option><option value="direct">Direct</option><option value="smart">Smart</option><option value="auto">Auto</option></select>
 <button class="ghost" id="out">Sign out</button></header>
 <div id="log"></div>
 <div class="comp"><textarea id="msg" rows="1" placeholder="Ask or give a task"></textarea>
 <button class="send" id="send" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
 </div>
 <script>
+try { var _rt = sessionStorage.getItem("rt"); if (_rt) document.addEventListener("DOMContentLoaded", function () { $("rt").value = _rt; }); } catch (e) {}
 var T = null, busy = false;
 try { T = sessionStorage.getItem("t"); } catch (e) {}
 function $(i){return document.getElementById(i);}
@@ -210,7 +212,8 @@ async function send(){
   busy = true; $("send").disabled = true;
   $("msg").value = ""; grow();
   add("u", t); typing(true);
-  var r = await post("/chat", {message: t}, T);
+  var rt = $("rt").value; try { sessionStorage.setItem("rt", rt); } catch (e) {}
+  var r = await post("/chat", {message: t, route: rt}, T);
   typing(false);
   if (r.status == 401) { keep(null); $("err").textContent = "Session ended. Sign in again."; show(); }
   else if (r.ok) {
