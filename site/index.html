@@ -94,6 +94,7 @@ i[data-i]{display:inline-grid;place-items:center}
 @media(min-width:900px){body.dro #scrim{opacity:0;pointer-events:none}body.dro #app{margin-left:276px}}
 @media(prefers-reduced-motion:reduce){#dr,#scrim,#app{transition:none!important}}
 .view .it{text-align:left;padding:12px 14px;margin:0 0 10px;border:1px solid var(--gb);border-radius:14px;background:rgba(127,127,127,.08)}.view .it b{color:var(--text)}.view .it small{display:block;margin-top:4px;color:var(--mute);word-break:break-word}.view .kv{display:flex;justify-content:space-between;gap:12px}.view .kv span{color:var(--mute)}.view .tg{margin:0 0 12px}
+.cb{position:relative;margin:8px 0}.cb pre{margin:0;padding:30px 12px 12px;border-radius:12px;overflow-x:auto;background:rgba(127,127,127,.14);font-size:13px;line-height:1.5}.cb pre code{background:none;padding:0;font-family:ui-monospace,Menlo,Consolas,monospace}.cb .cc{position:absolute;top:6px;right:6px;padding:3px 10px;font-size:11px;border-radius:8px;border:1px solid var(--gb);background:var(--glass);color:var(--text)}
 </style></head><body>
 <div id="login">
 <form class="card" id="lf">
@@ -148,6 +149,12 @@ function md(src){
   function close(){ if (ul) { out.push("</ul>"); ul = false; } }
   while (i < L.length) {
     var l = L[i];
+    if (/^\s*`{3}/.test(l)) {
+      close(); var cd = []; i++;
+      while (i < L.length && !/^\s*`{3}/.test(L[i])) { cd.push(L[i]); i++; }
+      i++; out.push('<div class="cb"><button class="cc">Copy</button><pre><code>' + esc(cd.join("\n")) + '</code></pre></div>');
+      continue;
+    }
     if (/^\s*\|.*\|\s*$/.test(l)) {
       close();
       var rows = [];
@@ -243,30 +250,34 @@ async function login(ev){
 }
 function grow(){
   var m = $("msg"); m.style.height = "auto";
-  m.style.height = Math.min(m.scrollHeight, 140) + "px";
+  var sh = m.scrollHeight;
+  m.style.height = sh > 0 ? Math.min(sh, 140) + "px" : "";
 }
 async function send(){
   var t = $("msg").value.trim();
   if (!t || busy) return;
-  busy = true; $("send").disabled = true;
+  busy = true; stopMode(true);
+  var ctl = new AbortController(); CTL = ctl;
   $("msg").value = ""; grow();
   add("u", t); typing(true);
   var rt = $("rt").value; try { sessionStorage.setItem("rt", rt); } catch (e) {}
-  var r = await post("/chat", {message: t, route: rt}, T);
-  typing(false);
+  var r = await postc("/chat", {message: t, route: rt}, T, ctl.signal);
+  typing(false); LAST = t;
   if (r.status == 401) { keep(null); $("err").textContent = "Session ended. Sign in again."; show(); }
   else if (r.ok) {
     add("b", r.j.reply);
     $("st").textContent = (r.j.engine_used || "").replace(/^.*\(|\)$/g, "") || "Online";
-  } else add("b", "That didn't go through (error " + r.status + "). Send it again.");
-  busy = false; $("send").disabled = false; $("msg").focus();
+  } else if (r.aborted) add("b", "Stopped.");
+  else add("b", "That didn't go through (error " + r.status + "). Send it again.");
+  if (r.status != 401) addRetry();
+  busy = false; CTL = null; stopMode(false); $("msg").focus(); pulse();
 }
 function out(){
   var t = T; keep(null); $("log").innerHTML = ""; $("st").textContent = "Online"; show();
   post("/logout", {}, t);
 }
 $("lf").onsubmit = login;
-$("send").onclick = send;
+$("send").onclick = function(){ if (busy) { if (CTL) CTL.abort(); } else send(); };
 $("out").onclick = out;
 $("msg").oninput = grow;
 $("msg").onkeydown = function(e){
@@ -350,6 +361,59 @@ async function load(n){
 $("q1").onclick = function(){ apAll = 0; tab("approvals"); };
 $("q2").onclick = function(){ actToday = true; tab("activity"); };
 $("q3").onclick = function(){ tab("status"); };
+var CTL = null, LAST = "", SENDHTML = null;
+async function postc(path, body, tok, sig){
+  var h = {"Content-Type": "application/json"}, r, j = {};
+  if (tok) h["X-Session"] = tok;
+  try { r = await fetch(path, {method: "POST", headers: h, body: JSON.stringify(body || {}), signal: sig}); }
+  catch (e) { return {ok: false, status: 0, j: {}, aborted: !!(sig && sig.aborted)}; }
+  try { j = await r.json(); } catch (e) {}
+  return {ok: r.ok, status: r.status, j: j};
+}
+function stopMode(on){
+  var b = $("send");
+  if (SENDHTML === null) SENDHTML = b.innerHTML;
+  b.innerHTML = on ? '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>' : SENDHTML;
+  b.setAttribute("aria-label", on ? "Stop" : "Send");
+}
+function addRetry(){
+  document.querySelectorAll(".rty").forEach(function(x){ x.remove(); });
+  var ms = $("log").querySelectorAll(".msg.b .meta"), m = ms[ms.length - 1];
+  if (!m || !LAST) return;
+  var c = document.createElement("button");
+  c.className = "rty"; c.textContent = "Retry";
+  c.onclick = function(){
+    var a = $("log").querySelectorAll(".msg");
+    if (busy || a.length < 2) return;
+    a[a.length - 1].remove(); a[a.length - 2].remove();
+    $("msg").value = LAST; send();
+  };
+  m.appendChild(c);
+}
+$("log").addEventListener("click", function(e){
+  var c = e.target.closest ? e.target.closest(".cc") : null;
+  if (!c) return;
+  try { navigator.clipboard.writeText(c.parentNode.querySelector("pre").textContent); c.textContent = "Copied"; } catch (x) {}
+  setTimeout(function(){ c.textContent = "Copy"; }, 1500);
+});
+function newChat(){
+  if (busy) return;
+  $("log").innerHTML = ""; empty(); $("msg").value = ""; grow(); LAST = ""; tab("chat"); grow(); pulse();
+}
+var nb = document.createElement("button");
+nb.className = "ghost"; nb.id = "nc"; nb.setAttribute("aria-label", "New chat");
+nb.style.cssText = "padding:8px;margin-left:auto"; nb.onclick = newChat;
+nb.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+$("out").style.marginLeft = "8px";
+$("out").parentNode.insertBefore(nb, $("out"));
+async function pulse(){
+  if (!T) return;
+  var g = await get("/web/status");
+  if (g.status == 401) return;
+  var ok = g.ok && g.j && g.j.database == "ok" && g.j.redis == "ok";
+  document.querySelectorAll(".dot").forEach(function(d){ d.style.background = ok ? "#16a34a" : "var(--err)"; });
+}
+pulse(); setInterval(pulse, 60000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 show();
 </script></body></html>
