@@ -198,14 +198,14 @@ async def web_agent_run(agent_id: str, body: RunIn, request: Request,
 
 # ---- Chief of Staff delegation (session protected) ----
 DELEGATE_KEYS = [
-    ("CTO Agent", ["code", "bug", "github", "deploy", "server", "debug", "software", "website"]),
-    ("CFO Agent", ["gst", "tax", "invoice", "budget", "account", "financ", "reconcil", "payment"]),
-    ("CMO Agent", ["marketing", "brand", "campaign", "advert", "social media", "content"]),
-    ("CSO Agent", ["sales", "lead", "customer acquisition", "revenue", "prospect"]),
-    ("CHRO Agent", ["hire", "hiring", "recruit", "payroll", "employee", "salary"]),
-    ("CLO Agent", ["legal", "contract", "compliance", "licen", "lawyer"]),
-    ("COO Agent", ["operation", "vendor", "process", "supplier", "logistics"]),
-    ("CCO Agent", ["support", "complaint", "refund", "customer service", "ticket"]),
+    ("CTO Agent", ["code", "bug", "github", "deploy", "server", "debug", "software", "website", "api", "database", "docker", "security", "repository", "test"]),
+    ("CFO Agent", ["gst", "tax", "invoice", "budget", "account", "financ", "reconcil", "payment", "invest", "debt", "loan", "bank", "insurance", "valuation", "profit", "cash flow", "equity", "mutual fund", "portfolio", "interest rate", "audit", "treasury"]),
+    ("CMO Agent", ["marketing", "brand", "campaign", "advert", "social media", "content", "seo", "promotion"]),
+    ("CSO Agent", ["sales", "lead", "customer acquisition", "revenue", "prospect", "negotiat", "pipeline", "quote", "deal"]),
+    ("CHRO Agent", ["hire", "hiring", "recruit", "payroll", "employee", "salary", "interview", "attendance", "training", "performance review"]),
+    ("CLO Agent", ["legal", "contract", "compliance", "licen", "lawyer", "trademark", "copyright", "lawsuit", "privacy", "court"]),
+    ("COO Agent", ["operation", "vendor", "process", "supplier", "logistics", "inventory", "stock", "warehouse", "shipping", "quality", "project"]),
+    ("CCO Agent", ["support", "complaint", "refund", "customer service", "ticket", "voice", "phone", "helpdesk", "return"]),
 ]
 
 
