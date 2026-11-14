@@ -2,12 +2,12 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e1419">
+<meta name="theme-color" content="#e8f1ff">
 <link rel="manifest" href="/manifest.json">
 <title>Arox</title>
 <style>
-:root{--bg:#0e1419;--panel:#161e26;--line:#25313c;--text:#e6edf3;--mute:#8b9bab;--acc:#46d1b5;--ink:#04231d;--err:#ff7b72}
-@media(prefers-color-scheme:light){:root{--bg:#f3f6f8;--panel:#fff;--line:#d9e1e7;--text:#14202a;--mute:#5d6d7b;--acc:#0f9d84;--ink:#fff;--err:#c62828}}
+:root{--bg:#e8f1ff;--panel:#ffffff;--line:#d3e0f5;--text:#14202a;--mute:#5d6d7b;--acc:#2563eb;--ink:#ffffff;--err:#ff7b72}
+@media(prefers-color-scheme:light){:root{--bg:#f3f6f8;--panel:#fff;--line:#d9e1e7;--text:#14202a;--mute:#5d6d7b;--acc:#2563eb;--ink:#fff;--err:#c62828}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:16px/1.5 "Avenir Next","Segoe UI",system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -61,16 +61,16 @@ header small{color:var(--mute);display:block;font-size:13px}
 .send{width:46px;height:46px;border-radius:50%;background:var(--acc);color:var(--ink);display:grid;place-items:center;flex:none}
 .send:disabled{opacity:.4}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
-:root{--glass:rgba(22,30,38,.55);--gb:rgba(255,255,255,.1);--sh:0 8px 32px rgba(0,0,0,.35)}
+:root{--glass:rgba(255,255,255,.55);--gb:rgba(255,255,255,.85);--sh:0 8px 32px rgba(37,99,235,.14)}
 @media(prefers-color-scheme:light){:root{--glass:rgba(255,255,255,.6);--gb:rgba(255,255,255,.75);--sh:0 8px 32px rgba(31,45,61,.12)}}
-body{background:radial-gradient(520px 420px at 0% 0%,rgba(70,209,181,.25),transparent 70%),radial-gradient(560px 520px at 100% 100%,rgba(99,102,241,.25),transparent 70%),var(--bg);background-attachment:fixed}
+body{background:radial-gradient(520px 420px at 0% 0%,rgba(96,165,250,.4),transparent 70%),radial-gradient(560px 520px at 100% 100%,rgba(56,189,248,.32),transparent 70%),var(--bg);background-attachment:fixed}
 header,#dr,.card,.b .bub,.chip,.comp textarea,.gsel,.ghost{-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%)}
 header{background:var(--glass);border:1px solid var(--gb);border-radius:18px;margin:8px 8px 0;box-shadow:var(--sh)}
 .comp{background:none;border:0;padding:8px 10px 10px}
 .comp textarea,.b .bub,.chip,.card{background:var(--glass);border:1px solid var(--gb);box-shadow:var(--sh)}
 .field input{background:var(--glass);border:1px solid var(--gb)}
-.u .bub,.send,.mark,.primary{background:linear-gradient(135deg,var(--acc),#2bb3d9)}
-.u .bub,.send{box-shadow:0 6px 20px rgba(70,209,181,.3)}
+.u .bub,.send,.mark,.primary{background:linear-gradient(135deg,var(--acc),#38bdf8)}
+.u .bub,.send{box-shadow:0 6px 20px rgba(96,165,250,.3)}
 .ghost{background:var(--glass);border:1px solid var(--gb);color:var(--text);display:grid;place-items:center}
 #dr{position:fixed;top:0;bottom:0;left:0;width:276px;max-width:84vw;z-index:20;display:flex;flex-direction:column;background:var(--glass);border-right:1px solid var(--gb);box-shadow:var(--sh);transform:translateX(-105%);transition:transform .25s ease;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 body.dro #dr{transform:none}
@@ -80,7 +80,7 @@ body.dro #scrim{opacity:1;pointer-events:auto}
 .dh b{font-size:18px;flex:1}
 #tabs{flex:1;overflow-y:auto;padding:6px 10px}
 #tabs button{display:flex;align-items:center;gap:12px;width:100%;padding:12px;margin-bottom:4px;border-radius:14px;background:none;color:var(--text);text-align:left;border:1px solid transparent}
-#tabs button.on{background:rgba(70,209,181,.16);border-color:var(--gb);color:var(--acc);font-weight:600}
+#tabs button.on{background:rgba(96,165,250,.16);border-color:var(--gb);color:var(--acc);font-weight:600}
 #tabs button:disabled{opacity:.45}
 #tabs .dl{margin:14px 12px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .df{padding:12px 14px 14px;border-top:1px solid var(--gb);display:flex;flex-direction:column;gap:6px}
