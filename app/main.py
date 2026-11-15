@@ -17,6 +17,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "app_db")
 API_KEY = os.getenv("API_KEY", "")
 APPROVER_KEY = os.getenv("APPROVER_KEY", "")
+CODING_GATEWAY_KEY = os.getenv("CODING_GATEWAY_KEY", "")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434/v1")
 LOCAL_MODEL_NAME = os.getenv("LOCAL_MODEL_NAME", "qwen2.5:7b")
@@ -28,6 +29,16 @@ CLOUD_FALLBACKS = [m.strip() for m in os.getenv("CLOUD_FALLBACK_MODELS", "openai
 
 def require_key(request: Request, x_api_key: str = Header(default="")):
     path = request.url.path
+    if path.startswith("/coding/v1/"):
+        token = x_api_key
+        authorization = request.headers.get("authorization", "")
+        if not token and authorization.lower().startswith("bearer "):
+            token = authorization[7:].strip()
+        if CODING_GATEWAY_KEY and hmac.compare_digest(
+            token.encode(), CODING_GATEWAY_KEY.encode()
+        ):
+            return
+        raise HTTPException(status_code=401, detail="Unauthorized")
     if request.method == "POST" and path in ("/login", "/chat", "/logout", "/bot/chat"):
         return
     if request.method in ("GET", "POST") and path.startswith("/web/"):
@@ -352,3 +363,6 @@ app.include_router(chat_router)
 
 from app.web_api import router as web_router  # noqa: E402
 app.include_router(web_router)
+
+from app.coding_gateway import router as coding_router
+app.include_router(coding_router)
