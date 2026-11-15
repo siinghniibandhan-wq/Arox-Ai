@@ -216,8 +216,9 @@ async def web_delegate(body: RunIn, request: Request,
     await need_session(x_session)
     from app.agent_router import select_agents
     pick = await select_agents(request.app.state.pool, body.instruction)
-    if pick["ask"]:
-        return {"needs_clarification": True, "question": pick["ask"],
+    if pick["ask"] or not pick["agents"]:
+        return {"needs_clarification": True,
+                "question": pick["ask"] or "Which executive should handle this?",
                 "reason": pick["reason"]}
     best = pick["agents"][0]
     async with request.app.state.pool.acquire() as c:
