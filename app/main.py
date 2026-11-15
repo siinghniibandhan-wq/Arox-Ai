@@ -249,21 +249,65 @@ OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "arox-smart")
 ROUTE_DEFAULT = os.getenv("ROUTE_DEFAULT", "auto")
 
 
-async def call_model(prompt: str, use_local: bool, route: str = None):
-    targets = []
+import logging as _logging
+
+_route_log = _logging.getLogger("arox.routing")
+# Transitional default for callers that pass no data_class. Set the env var
+# DEFAULT_DATA_CLASS=confidential once every caller passes an explicit class.
+DEFAULT_DATA_CLASS = os.getenv("DEFAULT_DATA_CLASS", "general")
+COMBO_BY_ROUTE = {
+    "smart": OMNIROUTE_MODEL, "auto": OMNIROUTE_MODEL,
+    "flash": "arox-flash", "complex": "arox-complex", "public": "arox-public",
+}
+# Data classes each combo may receive (handoff v8, section 3)
+COMBO_ALLOWED = {
+    "arox-public": {"public"},
+    "arox-flash": {"public", "general"},
+    "arox-smart": {"public", "general"},
+    "arox-complex": {"public", "general"},
+}
+# Cloud gateway: Groq is General-class; any other gateway is public-only
+CLOUD_ALLOWED = {"public", "general"} if "api.groq.com" in CLOUD_GATEWAY_URL else {"public"}
+
+
+def _norm_class(v):
+    v = v.strip().lower() if isinstance(v, str) else ""
+    return v if v in ("public", "general", "confidential") else "confidential"
+
+
+async def call_model(prompt: str, use_local: bool, route: str = None, data_class: str = None):
     rt = (route or ROUTE_DEFAULT).lower()
+    if data_class is None:
+        data_class = DEFAULT_DATA_CLASS
+        _route_log.warning("call_model without data_class; using default %r", data_class)
+    cls = _norm_class(data_class)
+    targets = []
+    blocked = []
     if use_local:
+        # local RAM model: data never leaves this machine, allowed for every class
         targets.append((OLLAMA_BASE_URL, {}, LOCAL_MODEL_NAME, "local_ram"))
-    if rt in ("smart", "auto") and OMNIROUTE_API_KEY:
-        targets.append((OMNIROUTE_URL,
-                        {"Authorization": f"Bearer {OMNIROUTE_API_KEY}"},
-                        OMNIROUTE_MODEL, "omniroute"))
+    combo = COMBO_BY_ROUTE.get(rt)
+    if combo and OMNIROUTE_API_KEY:
+        if cls in COMBO_ALLOWED.get(combo, set()):
+            targets.append((OMNIROUTE_URL,
+                            {"Authorization": f"Bearer {OMNIROUTE_API_KEY}"},
+                            combo, "omniroute"))
+        else:
+            blocked.append(f"{cls} data not allowed on {combo}")
     if CLOUD_API_KEY:
-        for mn in dict.fromkeys([CLOUD_MODEL_NAME] + CLOUD_FALLBACKS):
-            targets.append((CLOUD_GATEWAY_URL,
-                            {"Authorization": f"Bearer {CLOUD_API_KEY}"},
-                            mn, "cloud_api"))
+        if cls in CLOUD_ALLOWED:
+            for mn in dict.fromkeys([CLOUD_MODEL_NAME] + CLOUD_FALLBACKS):
+                targets.append((CLOUD_GATEWAY_URL,
+                                {"Authorization": f"Bearer {CLOUD_API_KEY}"},
+                                mn, "cloud_api"))
+        else:
+            blocked.append(f"{cls} data not allowed on cloud gateway")
+    if blocked:
+        _route_log.warning("data-class blocks: %s", "; ".join(blocked))
     if not targets:
+        if blocked:
+            raise HTTPException(status_code=403,
+                                detail="Blocked by data-class policy: " + "; ".join(blocked))
         raise HTTPException(status_code=503, detail="No model configured")
     last = None
     for url, headers, model, label in targets:
