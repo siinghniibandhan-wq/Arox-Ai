@@ -495,7 +495,7 @@ async function agDelegate(){
   var ins = prompt("Tell Chief of Staff what you need (plan only)"); if (!ins) return;
   var out = $("agout"); if (!out) return;
   out.innerHTML = item("<b>Chief of Staff</b>", "Choosing an executive...");
-  try { var r = await agSend("/web/delegate", {instruction: ins}); out.innerHTML = item("<b>" + e2(r.delegated_to) + "</b> · " + e2(r.engine_used), '<span style="white-space:pre-wrap">' + e2(r.reply) + "</span>"); }
+  try { var r = await agSend("/web/delegate", {instruction: ins}); if (r.needs_clarification) { out.innerHTML = item("<b>Chief of Staff needs one detail</b>", e2(r.question)); } else { out.innerHTML = item("<b>" + e2(r.delegated_to) + "</b> · " + e2(r.engine_used), e2(r.reason || "") + (r.also_consult && r.also_consult.length ? "<br>Also relevant: " + e2(r.also_consult.join(", ")) : "") + '<br><span style="white-space:pre-wrap">' + e2(r.reply) + "</span>"); } }
   catch(e) { out.innerHTML = item("<b>Error</b>", e2(e.message)); }
 }
 </script></body></html>

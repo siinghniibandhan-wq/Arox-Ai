@@ -214,12 +214,12 @@ async def web_delegate(body: RunIn, request: Request,
                        x_session: str = Header(default="")):
     from fastapi import HTTPException
     await need_session(x_session)
-    text = body.instruction.lower()
-    best, best_hits = "Chief of Staff Core", 0
-    for name, words in DELEGATE_KEYS:
-        hits = sum(1 for w in words if w in text)
-        if hits > best_hits:
-            best, best_hits = name, hits
+    from app.agent_router import select_agents
+    pick = await select_agents(request.app.state.pool, body.instruction)
+    if pick["ask"]:
+        return {"needs_clarification": True, "question": pick["ask"],
+                "reason": pick["reason"]}
+    best = pick["agents"][0]
     async with request.app.state.pool.acquire() as c:
         aid = await c.fetchval(
             "SELECT id::text FROM ai.agents WHERE name = $1 AND is_active", best)
@@ -228,4 +228,6 @@ async def web_delegate(body: RunIn, request: Request,
     body.requester = "Owner (web, via Chief of Staff)"
     out = await run_agent(aid, body, request)
     out["delegated_to"] = best
+    out["also_consult"] = pick["agents"][1:]
+    out["reason"] = pick["reason"]
     return out
