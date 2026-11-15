@@ -99,7 +99,36 @@ async def bot_chat(c, text):
     await tg(c, "sendMessage", chat_id=OWNER, text=out[:4000])
 
 
+pushed = set()
+
+
+async def push_loop():
+    first = True
+    async with httpx.AsyncClient() as c:
+        while True:
+            try:
+                code, rows = await api(c, "GET", "/approvals", status="pending")
+                if code == 200 and isinstance(rows, list):
+                    for r in reversed(rows):
+                        if r["id"] in pushed:
+                            continue
+                        pushed.add(r["id"])
+                        if first:
+                            continue
+                        text = (f"New approval request #{r['id']}\n"
+                                f"Level {r['level']}: {r['tool']}\n"
+                                f"From: {r['requester']}\n"
+                                f"Args: {str(r['args'])[:500]}")
+                        await tg(c, "sendMessage", chat_id=OWNER, text=text,
+                                 reply_markup=buttons(r["id"], r["level"]))
+                    first = False
+            except Exception as e:
+                log.warning("push loop: %s", e)
+            await asyncio.sleep(10)
+
+
 async def main():
+    asyncio.create_task(push_loop())
     async with httpx.AsyncClient() as c:
         await tg(c, "deleteWebhook", drop_pending_updates=True)
         log.info("bot started")
