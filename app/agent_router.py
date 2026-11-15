@@ -29,7 +29,7 @@ async def select_agents(pool, message: str):
         f"Executives:\n{roster}\n"
         f"Request: {json.dumps(message)}"
     )
-    text, engine = await call_model(prompt, DEPLOYMENT_ENV == "local_hardware")
+    text, engine = await call_model(prompt, DEPLOYMENT_ENV == "local_hardware", data_class="general")
     m = re.search(r"\{.*\}", text or "", re.S)
     try:
         d = json.loads(m.group(0)) if m else {}
