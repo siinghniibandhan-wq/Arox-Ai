@@ -99,6 +99,41 @@ async def bot_chat(c, text):
     await tg(c, "sendMessage", chat_id=OWNER, text=out[:4000])
 
 
+CODE_URL = "http://aws_ai_n8n:5678/webhook/arox-coding-task"
+
+
+RESULT_URL = "http://aws_ai_n8n:5678/webhook/arox-coding-result"
+
+
+async def code_task(c, task):
+    try:
+        key = open("/run/secrets/coding_webhook_key").read().strip()
+        h = {"X-AROX-Webhook-Key": key}
+        r = await c.post(CODE_URL, json={"task": task[:4000]}, headers=h, timeout=120)
+        if r.status_code != 200:
+            await tg(c, "sendMessage", chat_id=OWNER,
+                     text="Coding task failed (%s)" % r.status_code)
+            return
+        sid = r.json().get("sessionId", "")
+        await tg(c, "sendMessage", chat_id=OWNER,
+                 text="Coding task started. I will message you when OpenCode finishes.")
+        for _ in range(60):
+            await asyncio.sleep(15)
+            try:
+                q = await c.post(RESULT_URL, json={"sessionId": sid}, headers=h, timeout=60)
+                if q.status_code == 200 and q.json().get("done"):
+                    out = "Coding task finished.\n\n" + q.json().get("text", "")
+                    await tg(c, "sendMessage", chat_id=OWNER, text=out[:4000])
+                    return
+            except Exception:
+                pass
+        await tg(c, "sendMessage", chat_id=OWNER,
+                 text="Coding task is still running after 15 minutes. Check GitHub for opencode/* branches.")
+    except Exception as e:
+        await tg(c, "sendMessage", chat_id=OWNER,
+                 text="Coding task error: " + type(e).__name__)
+
+
 pushed = set()
 
 
@@ -153,6 +188,13 @@ async def main():
                                 route["v"] = arg
                             await tg(c, "sendMessage", chat_id=OWNER,
                                      text="Route: " + (route["v"] or "default"))
+                        elif txt.startswith("/code"):
+                            task = txt.partition(" ")[2].strip()
+                            if len(task) < 5:
+                                await tg(c, "sendMessage", chat_id=OWNER,
+                                         text="Usage: /code <task description>")
+                            else:
+                                asyncio.create_task(code_task(c, task))
                         elif txt and not txt.startswith("/"):
                             await tg(c, "sendChatAction", chat_id=OWNER,
                                      action="typing")

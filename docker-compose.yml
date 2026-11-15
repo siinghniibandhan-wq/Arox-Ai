@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:1.76.1
+    image: docker.n8n.io/n8nio/n8n:2.47.7
     container_name: aws_ai_n8n
     environment:
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?missing}
@@ -94,6 +94,8 @@ services:
   bot:
     build: {context: ./bot}
     container_name: aws_ai_bot
+    volumes:
+      - /etc/arox/coding_webhook_key:/run/secrets/coding_webhook_key:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?missing}
       - OWNER_TELEGRAM_ID=${OWNER_TELEGRAM_ID:?missing}
@@ -119,7 +121,8 @@ services:
     restart: unless-stopped
 
   opencode:
-    image: ghcr.io/anomalyco/opencode:2.0.0
+    build: ./opencode-image
+    image: arox-opencode-git:2.0.0
     container_name: arox_opencode
     user: "1000:1000"
     working_dir: /workspace
@@ -127,6 +130,7 @@ services:
     environment:
       - AROX_CODING_KEY=${CODING_GATEWAY_KEY:?missing}
       - OPENCODE_PASSWORD=${OPENCODE_PASSWORD:?missing}
+      - GITHUB_TOKEN=${GITHUB_TOKEN_OPENCODE:?missing}
       - HOME=/data/home
       - XDG_CONFIG_HOME=/data/config
       - XDG_DATA_HOME=/data/share
