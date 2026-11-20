@@ -114,6 +114,21 @@ async def run_agent(agent_id: str, body: RunIn, request: Request):
             f = SKILLS_DIR / Path(fp or "").name
             if fp and f.is_file():
                 skill_text.append(f.read_text(encoding="utf-8")[:6000])
+    # --- Shelf-only tool branch (added). All other agents stay plan-only. ---
+    from app.tools_product import SHELF_NAME, handle_shelf
+    if ag["name"] == SHELF_NAME:
+        try:
+            tool_out = await handle_shelf(body.instruction, call_model, DEPLOYMENT_ENV)
+        except Exception as e:  # never break chat; say what happened
+            tool_out = (f"Shelf's product tool had an error ({type(e).__name__}). "
+                        "Nothing was created."), "shelf-tool"
+        if tool_out is not None:
+            t_reply, t_engine = tool_out
+            await audit(f"{ag['name']} [{t_engine}]", "agent_tool", agent_id, None,
+                        {"requester": body.requester,
+                         "instruction": body.instruction, "reply": t_reply})
+            return {"agent": ag["name"], "engine_used": t_engine, "reply": t_reply}
+    # --- end of added branch ---
     prompt = (
         f"System: {ag['system_prompt']}\n\n"
         "Skills you follow:\n" + "\n---\n".join(skill_text) + "\n\n"
