@@ -27,3 +27,7 @@ aroxai.duckdns.org {
         reverse_proxy orchestrator:8000
     }
 }
+
+n8n.aroxai.duckdns.org {
+    reverse_proxy n8n:5678
+}

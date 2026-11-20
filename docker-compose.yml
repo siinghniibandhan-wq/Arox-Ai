@@ -58,6 +58,8 @@ services:
   orchestrator:
     build: {context: ., dockerfile: Dockerfile}
     container_name: aws_ai_orchestrator
+    volumes:
+      - /etc/arox/shelf_webhook_key:/run/secrets/shelf_webhook_key:ro
     environment:
       - DEPLOYMENT_ENV=cloud
       - API_KEY=${API_KEY:?missing}

@@ -136,6 +136,33 @@ async def run_chat(message: str, route: str, channel: str):
     from app.main import app as _app
     import asyncio
     import types
+    m = re.match(r"^\s*@([A-Za-z0-9_-]+)\s*(.*)$", message, re.S)
+    if m:
+        handle, task = m.group(1), m.group(2).strip()
+        async with _app.state.pool.acquire() as c:
+            rows = await c.fetch(
+                "SELECT id::text AS id, name FROM ai.agents "
+                "WHERE is_active AND lower(name) LIKE lower($1) || '%' "
+                "ORDER BY length(name) LIMIT 2", handle)
+        if not rows:
+            return {"engine_used": "router",
+                    "reply": f"No active agent starts with @{handle}."}
+        row = rows[0]
+        if not task:
+            return {"engine_used": "router",
+                    "reply": f"What should {row['name']} do? Type the task after @{handle}."}
+        shim = types.SimpleNamespace(app=_app)
+        try:
+            r = await run_agent(
+                row["id"], RunIn(instruction=task, requester="Owner (chat @)"), shim)
+        except HTTPException:
+            return {"engine_used": "router",
+                    "reply": f"{row['name']} could not answer just now. Please try again."}
+        text = f"{r['reply']}\n\n- {row['name']}"
+        await audit(f"{row['name']} [{r['engine_used']}]", "chat_mention", channel,
+                    None, {"message": message, "reply": text})
+        return {"engine_used": r["engine_used"], "reply": text,
+                "agents": [row["name"]]}
     try:
         pick = await select_agents(_app.state.pool, message)
     except HTTPException:
