@@ -1,6 +1,43 @@
-# Arox-Ai
+# Arox-Ai Orchestrator
 
-## Changelog 22-23 Nov 2026
+The Arox-Ai Orchestrator is a FastAPI-based service designed to act as a centralized AI task dispatcher and orchestration hub. It manages LLM interactions, tool execution with approval workflows, and multi-departmental task routing.
+
+## Core Capabilities
+
+- **AI Orchestration**: Dispatches tasks to appropriate LLM providers based on complexity, data class requirements (public, general, confidential), and availability (local vs cloud).
+- **Task Dispatching**: A "Chief of Staff" agent classifies and plans tasks before execution.
+- **Tool Execution & Security**: Provides a robust framework for executing tools with defined safety levels, including manual approval for sensitive operations.
+- **Auditing**: Comprehensive audit logging for all tool executions and approvals.
+- **Multi-Modal Routing**: Integrated routing for coding tasks, general chat, web APIs, and specialized skills.
+
+## Architecture & Routing
+
+The orchestrator routes requests through several specialized subsystems:
+- `/coding/`: Coding task gateway.
+- `/chat/`: Conversational interface.
+- `/web/`: Web-based interaction API.
+- `/ai/dispatch`: Intelligent task analysis and planning.
+
+## Configuration
+
+The system is configured via environment variables:
+
+- **Environment**: `DEPLOYMENT_ENV` (e.g., `cloud`, `local_hardware`)
+- **Database**: PostgreSQL connection details (`DB_HOST`, `DB_PORT`, etc.)
+- **Security**: API keys for different interfaces (`API_KEY`, `APPROVER_KEY`, `CODING_GATEWAY_KEY`)
+- **Model Providers**:
+    - **Local**: Ollama (`OLLAMA_BASE_URL`, `LOCAL_MODEL_NAME`)
+    - **Cloud**: Groq, etc. (`CLOUD_GATEWAY_URL`, `CLOUD_API_KEY`)
+    - **OmniRoute**: (`OMNIROUTE_URL`, `OMNIROUTE_API_KEY`, `OMNIROUTE_MODEL`)
+
+## Tool Workflow
+
+Tools are registered with specific safety levels (1-3).
+- Level 1: Automatic execution.
+- Level 2: Requires pending approval.
+- Level 3: Requires elevated approval (e.g., `?confirm=yes`).
+
+## Changelog (22-23 Nov 2026)
 
 - OmniRoute: login fixed. The admin password now comes from the OMNIROUTE_ADMIN_PASSWORD parameter and is re-applied on every start.
 - Models: Z.AI provider added (zai/glm-4.7-flash). Combo arox-complex falls back through several providers when one is overloaded.
