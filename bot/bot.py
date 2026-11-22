@@ -182,6 +182,8 @@ async def main():
                         txt = m.get("text", "")
                         if txt.startswith(("/pending", "/start")):
                             await show_pending(c)
+                        elif txt.startswith("/hello"):
+                            await tg(c, "sendMessage", chat_id=OWNER, text="Hello!")
                         elif txt.startswith("/route"):
                             arg = txt.partition(" ")[2].strip().lower()
                             if arg in ("direct", "smart", "auto"):
