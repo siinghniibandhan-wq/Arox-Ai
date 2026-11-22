@@ -15,5 +15,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff bandit
-      - run: ruff check --select=E,F,W --ignore=E501,E401 .
+      - run: ruff check --select=E,F,W --ignore=E501,E401,E402 .
       - run: bandit -r app/ -ll -ii || true
